@@ -119,7 +119,7 @@ Describe 'names catalog (contract section 10, naming standard)' {
     It 'both example files render the same name for every key' {
         $bicepExample = Get-Content -Path (Join-Path $script:root 'bicep\main.example.bicepparam') -Raw
         foreach ($key in $script:manifestNames) {
-            $bicepExample | Should -Match ("(?m)^\s+$key`: '" + [regex]::Escape($script:tfExample.names[$key]) + "'$") -Because "bicepparam names.$key must equal the tfvars value"
+            $bicepExample | Should -Match ("(?m)^\s+$key`: '" + [regex]::Escape($script:tfExample.names[$key]) + "'\r?$") -Because "bicepparam names.$key must equal the tfvars value"
         }
     }
 
