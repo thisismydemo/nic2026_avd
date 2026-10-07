@@ -11,6 +11,8 @@ Replace the placeholders in the commands with your own values:
 - `<location>` — an Azure region, for example eastus
 - `<user>` — a cloud-only test user, for example user1@yourtenant.onmicrosoft.com
 - `<storageaccount>` — a globally unique storage account name for the profile share
+- `<profile-share>` — the Azure Files share that holds the profile containers
+- `<odfc-share>` — the Azure Files share that holds the Office containers
 
 ## Follow along
 
@@ -94,7 +96,7 @@ Replace the placeholders in the commands with your own values:
 
 - Remove the role assignment and disable Entra Kerberos on the storage account if it was a test.
 
-**In the repo:** `automation/landing-zones/avd/scripts/Set-AvdStorageEntraKerberos.ps1`, `design/avd/landing-zone.md (section 7)`
+**In the repo:** `automation/landing-zones/avd/scripts/Set-AvdStorageEntraKerberos.ps1`, `handouts/Identity_Reference_Architecture.md`
 
 ### AVD on Azure: host pool and session hosts
 
@@ -222,7 +224,7 @@ Replace the placeholders in the commands with your own values:
 
 - Delete the data collection rule and association if it was a test.
 
-**In the repo:** `design/avd/landing-zone.md (section 9)`
+**In the repo:** `handouts/Deployment_Checklist.md`
 
 ### Data collection rules that keep costs sane
 
@@ -349,21 +351,21 @@ Replace the placeholders in the commands with your own values:
 1. **Apply the FSLogix settings.** Apply the repo's configuration profile (replace the share path with yours).
 
    ```powershell
-   ./automation/avd/fslogix/scripts/Set-FslogixHostConfig.ps1 -ProfileShareUnc \\<storageaccount>.file.core.windows.net\nic26-fslogix-profiles -OdfcShareUnc \\<storageaccount>.file.core.windows.net\nic26-fslogix-odfc -Execute
+   ./automation/avd/fslogix/scripts/Set-FslogixHostConfig.ps1 -ProfileShareUnc \\<storageaccount>.file.core.windows.net\<profile-share> -OdfcShareUnc \\<storageaccount>.file.core.windows.net\<odfc-share> -Execute
    ```
 
    - You should see: Test-FslogixHostConfig reports the settings applied.
 2. **Sign in once and check the container.** Sign in to the host as a test user, sign out, then list the share.
 
    ```powershell
-   Get-ChildItem \\<storageaccount>.file.core.windows.net\nic26-fslogix-profiles -Recurse -Filter *.vhdx
+   Get-ChildItem \\<storageaccount>.file.core.windows.net\<profile-share> -Recurse -Filter *.vhdx
    ```
 
    - You should see: A Profile VHDX (and ODFC VHDX) exists under the user's folder.
 3. **Publish redirections.xml.** Publish the exclusion file to the share so every host uses the same one.
 
    ```powershell
-   ./automation/avd/fslogix/scripts/Publish-FslogixRedirections.ps1 -ProfileShareUnc \\<storageaccount>.file.core.windows.net\nic26-fslogix-profiles -Execute
+   ./automation/avd/fslogix/scripts/Publish-FslogixRedirections.ps1 -ProfileShareUnc \\<storageaccount>.file.core.windows.net\<profile-share> -Execute
    ```
 
    - You should see: redirections.xml is in the redirections folder of the share.
@@ -578,7 +580,7 @@ Replace the placeholders in the commands with your own values:
 
 - None.
 
-**In the repo:** `design/avd/landing-zone.md (section 9)`
+**In the repo:** `handouts/Deployment_Checklist.md`
 
 ## Read along
 
@@ -656,5 +658,5 @@ Replace the placeholders in the commands with your own values:
 
 **Goal:** Understand the two GPU modes.
 
-**In the repo:** `design/avd/landing-zone.md`
+**In the repo:** `handouts/Realm_Comparison.md`
 
