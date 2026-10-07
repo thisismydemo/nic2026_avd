@@ -1,0 +1,821 @@
+{
+  "id": "avd",
+  "title": "AVD Anywhere",
+  "subtitle": "Azure Virtual Desktop on Azure, Azure Local, and AVD Hybrid Platforms",
+  "date": "Wed 14 Oct 2026, 13:20 (W. Europe Time)",
+  "length": 60,
+  "level": 400,
+  "followAlongPolicy": "Full follow-along: every demo has an attendee version. Azure and the portability pattern need no special hardware; Azure Local and Hybrid steps are hypervisor-agnostic with lab values as variables.",
+  "variables": [
+    {
+      "name": "<sub>",
+      "meaning": "your subscription id"
+    },
+    {
+      "name": "<rg>",
+      "meaning": "your resource group for the AVD control plane"
+    },
+    {
+      "name": "<location>",
+      "meaning": "an Azure region, for example eastus"
+    },
+    {
+      "name": "<user>",
+      "meaning": "a cloud-only test user, for example user1@yourtenant.onmicrosoft.com"
+    },
+    {
+      "name": "<storageaccount>",
+      "meaning": "a globally unique storage account name for the profile share"
+    },
+    {
+      "name": "<profile-share>",
+      "meaning": "the Azure Files share that holds the profile containers"
+    },
+    {
+      "name": "<odfc-share>",
+      "meaning": "the Azure Files share that holds the Office containers"
+    }
+  ],
+  "sections": [
+    {
+      "id": "0",
+      "title": "Open — three realms, one desktop",
+      "minutes": 2
+    },
+    {
+      "id": "1",
+      "title": "The realms compared — five decision axes",
+      "minutes": 2
+    },
+    {
+      "id": "2",
+      "title": "The foundation, network and failure domains",
+      "minutes": 3
+    },
+    {
+      "id": "2B",
+      "title": "Identity — one identity, three paths",
+      "minutes": 5
+    },
+    {
+      "id": "3",
+      "title": "AVD on Azure",
+      "minutes": 6
+    },
+    {
+      "id": "4",
+      "title": "AVD on Azure Local",
+      "minutes": 6
+    },
+    {
+      "id": "5",
+      "title": "AVD Hybrid",
+      "minutes": 7
+    },
+    {
+      "id": "6",
+      "title": "Profiles — one pattern for three realms",
+      "minutes": 8
+    },
+    {
+      "id": "7",
+      "title": "The automation and the operating model",
+      "minutes": 4
+    },
+    {
+      "id": "8",
+      "title": "The crossing — live end-to-end demo",
+      "minutes": 13
+    },
+    {
+      "id": "9",
+      "title": "Take-home, tomorrow's session, other sessions, close",
+      "minutes": 2
+    }
+  ],
+  "demos": [
+    {
+      "id": "a0-three-pools",
+      "title": "One workspace, three host pools, all Available",
+      "section": "0",
+      "mode": "live",
+      "minutes": 0.25,
+      "followAlong": {
+        "level": "full",
+        "goal": "See your own workspace, host pools and session host status in one view.",
+        "needs": [
+          "An AVD workspace with at least one host pool",
+          "Az.DesktopVirtualization module"
+        ],
+        "steps": [
+          {
+            "title": "List host pools in the workspace's resource group",
+            "instructions": "List the host pools and the status of their session hosts.",
+            "command": "Get-AzWvdHostPool -ResourceGroupName <rg> | Select-Object Name, HostPoolType, LoadBalancerType\nGet-AzWvdHostPool -ResourceGroupName <rg> | ForEach-Object { Get-AzWvdSessionHost -ResourceGroupName <rg> -HostPoolName $_.Name | Select-Object Name, Status, Session }",
+            "check": "Each host pool lists its session hosts with Status Available."
+          }
+        ],
+        "troubleshooting": [
+          "Status Unavailable: check the host's network access to the AVD service URLs and the agent version."
+        ],
+        "cleanup": [
+          "None; read-only."
+        ],
+        "repoPaths": [
+          "automation/demo/avd/scripts/Show-AvdState.ps1"
+        ]
+      }
+    },
+    {
+      "id": "a2-foundation-as-code",
+      "title": "The foundation as code",
+      "section": "2",
+      "mode": "live",
+      "minutes": 0.75,
+      "followAlong": {
+        "level": "read",
+        "goal": "Understand how the foundation is organised so you can adapt it.",
+        "needs": [
+          "The repo checked out"
+        ],
+        "steps": [
+          {
+            "title": "Read the solution layout",
+            "instructions": "Open automation/landing-zones/avd and compare the Bicep and Terraform folders; both take the inputs listed in solution.yml.",
+            "command": "Get-ChildItem automation/landing-zones/avd -Recurse -Depth 2 | Select-Object FullName",
+            "check": "You can find bicep/, terraform/ and solution.yml."
+          },
+          {
+            "title": "Run a what-if of the foundation against your subscription",
+            "instructions": "Copy the example parameter file, replace the values with yours, and run a what-if. Nothing is created.",
+            "command": "az deployment sub what-if --location <location> --template-file automation/landing-zones/avd/bicep/main.bicep --parameters <your parameter file>",
+            "check": "A list of resources that would be created; no errors."
+          }
+        ],
+        "troubleshooting": [
+          "Provider not registered: register Microsoft.DesktopVirtualization first."
+        ],
+        "cleanup": [
+          "None; what-if creates nothing."
+        ],
+        "repoPaths": [
+          "automation/landing-zones/avd/README.md",
+          "automation/landing-zones/avd/solution.yml"
+        ]
+      }
+    },
+    {
+      "id": "a2b-identity-ticket",
+      "title": "Identity: three paths, one proof",
+      "section": "2B",
+      "mode": "live+recorded",
+      "minutes": 1,
+      "followAlong": {
+        "level": "full",
+        "goal": "Enable Entra Kerberos on an Azure Files share and confirm a Windows 11 Entra-joined VM obtains a ticket.",
+        "needs": [
+          "An Entra-joined Windows 11 VM",
+          "A storage account (FileStorage or StorageV2) with a file share",
+          "Rights to grant admin consent",
+          "Note: cloud-only identity support is a preview feature"
+        ],
+        "steps": [
+          {
+            "title": "Enable Entra Kerberos on the storage account",
+            "instructions": "In the portal: Storage account > File shares > Identity-based access > Microsoft Entra Kerberos > Set up. Enable it, then grant admin consent to the generated app registration.",
+            "command": "",
+            "check": "An app named [Storage Account] <storageaccount>.file.core.windows.net exists with consent granted."
+          },
+          {
+            "title": "Allow the ticket to be issued without MFA",
+            "instructions": "Exclude the storage account's app from Conditional Access policies that require MFA; the ticket request is silent and cannot prompt.",
+            "command": "",
+            "check": "The app appears under Exclude in the policy."
+          },
+          {
+            "title": "Enable cloud-only group support",
+            "instructions": "In the app registration manifest add the tag kdc_enable_cloud_group_sids. Use security groups that are not nested.",
+            "command": "",
+            "check": "The tag appears in the manifest tags array."
+          },
+          {
+            "title": "Enable ticket retrieval on the client",
+            "instructions": "Set the registry value that lets the client request the Entra Kerberos ticket and restart the client.",
+            "command": "reg add HKLM\\SYSTEM\\CurrentControlSet\\Control\\Lsa\\Kerberos\\Parameters /v CloudKerberosTicketRetrievalEnabled /t REG_DWORD /d 1 /f",
+            "check": "Value is 1."
+          },
+          {
+            "title": "Assign share-level permission",
+            "instructions": "Assign Storage File Data SMB Share Contributor to your users group on the share.",
+            "command": "New-AzRoleAssignment -ObjectId <group object id> -RoleDefinitionName 'Storage File Data SMB Share Contributor' -Scope <share resource id>",
+            "check": "The role assignment lists on the share."
+          },
+          {
+            "title": "Request the ticket",
+            "instructions": "Restart the client, then sign in again to the VM as an Entra user (the registry value takes effect at sign-in) and request a ticket for the storage account.",
+            "command": "klist get cifs/<storageaccount>.file.core.windows.net",
+            "check": "klist shows a ticket for the cifs service of the storage account."
+          }
+        ],
+        "troubleshooting": [
+          "No ticket: check the client is Entra-joined or hybrid-joined, the registry value, and the MFA exclusion.",
+          "Access denied after the ticket: check the share-level role and the NTFS ACL."
+        ],
+        "cleanup": [
+          "Remove the role assignment and disable Entra Kerberos on the storage account if it was a test."
+        ],
+        "repoPaths": [
+          "automation/landing-zones/avd/scripts/Set-AvdStorageEntraKerberos.ps1",
+          "handouts/Identity_Reference_Architecture.md"
+        ]
+      }
+    },
+    {
+      "id": "a3a-azure-host-pool",
+      "title": "AVD on Azure: host pool and session hosts",
+      "section": "3",
+      "mode": "live",
+      "minutes": 0.33,
+      "followAlong": {
+        "level": "full",
+        "goal": "Create a pooled host pool, desktop application group and workspace.",
+        "needs": [
+          "Az.DesktopVirtualization",
+          "Microsoft.DesktopVirtualization provider registered",
+          "A resource group"
+        ],
+        "steps": [
+          {
+            "title": "Create the host pool",
+            "instructions": "Create a pooled, breadth-first host pool with a session limit.",
+            "command": "$hp = New-AzWvdHostPool -ResourceGroupName <rg> -Name hp-demo-azure -Location <location> -HostPoolType Pooled -LoadBalancerType BreadthFirst -PreferredAppGroupType Desktop -MaxSessionLimit 4",
+            "check": "Get-AzWvdHostPool returns hp-demo-azure."
+          },
+          {
+            "title": "Create the desktop application group",
+            "instructions": "Create a desktop application group for the pool.",
+            "command": "$ag = New-AzWvdApplicationGroup -ResourceGroupName <rg> -Name ag-demo-azure -Location <location> -HostPoolArmPath $hp.Id -ApplicationGroupType Desktop",
+            "check": "The application group lists the host pool."
+          },
+          {
+            "title": "Create the workspace and register the group",
+            "instructions": "Create the workspace and add the application group.",
+            "command": "New-AzWvdWorkspace -ResourceGroupName <rg> -Name ws-demo -Location <location> -ApplicationGroupReference $ag.Id",
+            "check": "The workspace lists the application group."
+          },
+          {
+            "title": "Entitle a user group",
+            "instructions": "Assign the Desktop Virtualization User role on the application group.",
+            "command": "New-AzRoleAssignment -ObjectId <group object id> -RoleDefinitionName 'Desktop Virtualization User' -Scope $ag.Id",
+            "check": "The users appear on the application group's assignments."
+          }
+        ],
+        "troubleshooting": [
+          "Provider not registered: Register-AzResourceProvider -ProviderNamespace Microsoft.DesktopVirtualization."
+        ],
+        "cleanup": [
+          "Remove the workspace, application group and host pool when finished."
+        ],
+        "repoPaths": [
+          "automation/avd/control-plane"
+        ]
+      }
+    },
+    {
+      "id": "a3b-image-builder",
+      "title": "One image artifact: Image Builder to gallery to host pool",
+      "section": "3",
+      "mode": "live+recorded",
+      "minutes": 0.5,
+      "followAlong": {
+        "level": "full",
+        "goal": "Build a Windows 11 multi-session image with Azure Image Builder into a Compute Gallery.",
+        "needs": [
+          "Compute Gallery with an image definition",
+          "Image Builder identity with the gallery roles",
+          "Microsoft.VirtualMachineImages provider registered"
+        ],
+        "steps": [
+          {
+            "title": "Resolve an exact source image version",
+            "instructions": "Pin an exact marketplace version for reproducibility (Image Builder also accepts latest, resolved at build time).",
+            "command": "./automation/avd/images/azure/scripts/Get-PlatformImageVersion.ps1 -Location <location> -Publisher MicrosoftWindowsDesktop -Offer office-365 -Sku win11-25h2-avd-m365",
+            "check": "An exact version number is returned."
+          },
+          {
+            "title": "Deploy the template",
+            "instructions": "Deploy the Image Builder template from the repo with your gallery and identity.",
+            "command": "az deployment group create -g <rg> --template-file automation/avd/images/azure/bicep/main.bicep --parameters <your parameter file>",
+            "check": "The template shows provisioning Succeeded."
+          },
+          {
+            "title": "Start the build",
+            "instructions": "Start the build; it takes 45 to 90 minutes.",
+            "command": "./automation/avd/images/azure/scripts/Start-ImageBuild.ps1 -SubscriptionId <sub> -ResourceGroupName <rg> -Execute",
+            "check": "Run state moves to Running, then Succeeded."
+          },
+          {
+            "title": "Confirm the gallery image version",
+            "instructions": "List the versions of the image definition.",
+            "command": "Get-AzGalleryImageVersion -ResourceGroupName <rg> -GalleryName <gallery> -GalleryImageDefinitionName <definition> | Select-Object Name, ProvisioningState",
+            "check": "A new version with ProvisioningState Succeeded."
+          }
+        ],
+        "troubleshooting": [
+          "Build fails at the customiser: open the staging resource group's customization log."
+        ],
+        "cleanup": [
+          "Delete the image template and old image versions to avoid storage cost."
+        ],
+        "repoPaths": [
+          "automation/avd/images/azure"
+        ]
+      }
+    },
+    {
+      "id": "a3c-avd-insights",
+      "title": "AVD Insights",
+      "section": "3",
+      "mode": "live",
+      "minutes": 0.75,
+      "followAlong": {
+        "level": "full",
+        "goal": "Enable AVD Insights for a host pool.",
+        "needs": [
+          "A Log Analytics workspace",
+          "Session hosts with Azure Monitor Agent"
+        ],
+        "steps": [
+          {
+            "title": "Open Insights and run the configuration workbook",
+            "instructions": "In the portal open Azure Virtual Desktop > Insights, select the subscription, and use Open configuration workbook.",
+            "command": "",
+            "check": "The configuration workbook reports diagnostics enabled for the host pool and workspace."
+          },
+          {
+            "title": "Associate the Insights data collection rule with the hosts",
+            "instructions": "Create the data collection rule from the workbook and associate it with the session hosts.",
+            "command": "",
+            "check": "Host performance counters and events appear after the first collection interval."
+          }
+        ],
+        "troubleshooting": [
+          "No data: allow time for the first collection; confirm the Azure Monitor Agent is installed."
+        ],
+        "cleanup": [
+          "Delete the data collection rule and association if it was a test."
+        ],
+        "repoPaths": [
+          "handouts/Deployment_Checklist.md"
+        ]
+      }
+    },
+    {
+      "id": "a3d-dcr-cost",
+      "title": "Data collection rules that keep costs sane",
+      "section": "3",
+      "mode": "live",
+      "minutes": 0.5,
+      "followAlong": {
+        "level": "full",
+        "goal": "Measure what your session hosts cost to monitor and keep only what you need.",
+        "needs": [
+          "A Log Analytics workspace with host data"
+        ],
+        "steps": [
+          {
+            "title": "Measure ingestion by table",
+            "instructions": "Run the query in your workspace.",
+            "command": "Usage | where TimeGenerated > ago(30d) | where IsBillable == true | summarize GB = sum(Quantity)/1000.0 by DataType | order by GB desc",
+            "check": "A ranked list of tables by billable GB."
+          },
+          {
+            "title": "Review the DCR data sources",
+            "instructions": "Open the data collection rule and review counters, sampling rates and event channels; remove what you do not use.",
+            "command": "",
+            "check": "Only the counters and channels that Insights and your alerts need remain."
+          }
+        ],
+        "troubleshooting": [],
+        "cleanup": [
+          "None."
+        ],
+        "repoPaths": [
+          "automation/landing-zones/avd (monitoring modules)"
+        ]
+      }
+    },
+    {
+      "id": "a4a-azure-local-host-pool",
+      "title": "AVD on Azure Local: host pool and a session host as an Azure Local VM",
+      "section": "4",
+      "mode": "live",
+      "minutes": 0.9,
+      "followAlong": {
+        "level": "read",
+        "goal": "Understand how an Azure Local VM becomes an AVD session host; the steps need an Azure Local cluster.",
+        "needs": [
+          "An Azure Local cluster with an Arc Resource Bridge and a custom location (not required to read)"
+        ],
+        "steps": [
+          {
+            "title": "Create the VM from Azure",
+            "instructions": "Create an Azure Local VM from a gallery image on a logical network, then register it to the host pool with a registration token passed in memory.",
+            "command": "az stack-hci-vm create --name <vm> --resource-group <rg> --custom-location <custom location id> --image <image name> --admin-username <admin> --admin-password <read from a secure prompt, never typed into a script> --nics <nic name> --storage-path-id <storage path id>",
+            "check": "The VM lists as Succeeded under Azure Local virtual machines."
+          },
+          {
+            "title": "Register to the host pool",
+            "instructions": "Run the registration step with a token generated at deploy time.",
+            "command": "./automation/avd/session-hosts-azure-local/scripts/Register-AvdSessionHostsAzureLocal.ps1 -SubscriptionId <sub> -ResourceGroupName <vm rg> -HostPoolResourceGroup <rg> -HostPoolName <pool> -TokenScriptPath ./automation/avd/control-plane/scripts/New-AvdRegistrationToken.ps1 -Execute",
+            "check": "The host appears Available in the pool."
+          }
+        ],
+        "troubleshooting": [
+          "Host Unavailable: check outbound access to the AVD service URLs from the logical network."
+        ],
+        "cleanup": [
+          "Delete the VM and remove the session host from the pool."
+        ],
+        "repoPaths": [
+          "automation/avd/session-hosts-azure-local"
+        ]
+      }
+    },
+    {
+      "id": "a4b-gpu-evidence",
+      "title": "GPU on Azure Local: assignment mode and evidence",
+      "section": "4",
+      "mode": "recorded",
+      "minutes": 0.5,
+      "followAlong": {
+        "level": "read",
+        "goal": "Understand the two GPU modes.",
+        "needs": [],
+        "steps": [],
+        "troubleshooting": [],
+        "cleanup": [],
+        "repoPaths": [
+          "handouts/Realm_Comparison.md"
+        ]
+      }
+    },
+    {
+      "id": "a5a-hyperv-arc",
+      "title": "Plain Hyper-V VMs seen in Azure only as Arc machines",
+      "section": "5",
+      "mode": "live",
+      "minutes": 0.75,
+      "followAlong": {
+        "level": "full",
+        "goal": "Make an ordinary Windows VM on any hypervisor an Arc-enabled server.",
+        "needs": [
+          "A Windows 11 Enterprise VM (any hypervisor)",
+          "Rights to onboard Arc machines (Azure Connected Machine Onboarding on the resource group)",
+          "Outbound access to the Arc endpoints"
+        ],
+        "steps": [
+          {
+            "title": "Create the onboarding principal",
+            "instructions": "Create a service principal scoped only to the Arc resource group.",
+            "command": "$sp = New-AzADServicePrincipal -DisplayName spn-arc-onboard\nNew-AzRoleAssignment -ObjectId $sp.Id -RoleDefinitionName 'Azure Connected Machine Onboarding' -Scope /subscriptions/<sub>/resourceGroups/<arc rg>",
+            "check": "The role assignment exists on the Arc resource group."
+          },
+          {
+            "title": "Install and connect the Connected Machine agent in the guest",
+            "instructions": "In the guest, in an elevated session, download and run AzureConnectedMachineAgent.msi from the Microsoft download link in the Azure Arc documentation, then run the onboarding. Pass the secret in memory and never store it.",
+            "command": "azcmagent connect --service-principal-id <app id> --service-principal-secret <secret> --tenant-id <tenant> --subscription-id <sub> --resource-group <arc rg> --location <location> --resource-name <vm name>",
+            "check": "azcmagent show reports Connected."
+          }
+        ],
+        "troubleshooting": [
+          "Agent cannot connect: check outbound access to the Arc endpoints and the system clock."
+        ],
+        "cleanup": [
+          "azcmagent disconnect, then delete the Arc machine resource."
+        ],
+        "repoPaths": [
+          "automation/avd/session-hosts-hybrid/scripts/Install-ArcAgent.ps1"
+        ]
+      }
+    },
+    {
+      "id": "a5b-cloud-device-extension",
+      "title": "The AVD Hybrid extension on an Arc machine",
+      "section": "5",
+      "mode": "live",
+      "minutes": 0.5,
+      "followAlong": {
+        "level": "full",
+        "goal": "Register an Arc-enabled Windows 11 machine as an AVD Hybrid session host.",
+        "needs": [
+          "A standard host pool created without VMs and with a managed identity",
+          "Reader for that identity on the Arc resource group",
+          "An Arc-enabled, Entra-joined Windows 11 Enterprise VM",
+          "Az.DesktopVirtualization and Az.ConnectedMachine"
+        ],
+        "steps": [
+          {
+            "title": "Generate a registration token",
+            "instructions": "Create a short-lived token; keep it in memory only.",
+            "command": "$expires = (Get-Date).ToUniversalTime().AddHours(2).ToString('yyyy-MM-ddTHH:mm:ss.fffffffZ')\n$token = (New-AzWvdRegistrationInfo -ResourceGroupName <rg> -HostPoolName <pool> -ExpirationTime $expires).Token",
+            "check": "$token is populated."
+          },
+          {
+            "title": "Install the extension",
+            "instructions": "Install the AVD Hybrid extension on the Arc machine with the token as a protected setting.",
+            "command": "New-AzConnectedMachineExtension -Name 'Microsoft.AzureVirtualDesktop.CloudDeviceExtension' -ResourceGroupName <arc rg> -MachineName <machine> -Location <location> -Publisher 'Microsoft.AzureVirtualDesktop' -ExtensionType 'CloudDeviceExtension' -ProtectedSetting @{ registrationToken = $token }",
+            "check": "The extension shows Succeeded."
+          },
+          {
+            "title": "Wait for the host",
+            "instructions": "The host can take up to 15 minutes to become Available after the extension succeeds.",
+            "command": "Get-AzWvdSessionHost -ResourceGroupName <rg> -HostPoolName <pool> | Select-Object Name, Status",
+            "check": "The host shows Available."
+          }
+        ],
+        "troubleshooting": [
+          "Host stays Unavailable: confirm Reader for the pool's managed identity on the Arc resource group and outbound access to the AVD service URLs."
+        ],
+        "cleanup": [
+          "Remove the extension and the session host from the pool."
+        ],
+        "repoPaths": [
+          "automation/avd/session-hosts-hybrid/scripts/Register-HybridHosts.ps1"
+        ]
+      }
+    },
+    {
+      "id": "a6-profiles",
+      "title": "The profile share, per-user containers and the settings that make them portable",
+      "section": "6",
+      "mode": "live",
+      "minutes": 1,
+      "followAlong": {
+        "level": "full",
+        "goal": "Configure FSLogix profile and ODFC containers on an Azure Files share and confirm a container is created.",
+        "needs": [
+          "A session host (Entra-joined)",
+          "A share with Entra Kerberos enabled (see the identity demo)",
+          "FSLogix installed on the host"
+        ],
+        "steps": [
+          {
+            "title": "Apply the FSLogix settings",
+            "instructions": "Apply the repo's configuration profile (replace the share path with yours).",
+            "command": "./automation/avd/fslogix/scripts/Set-FslogixHostConfig.ps1 -ProfileShareUnc \\\\<storageaccount>.file.core.windows.net\\<profile-share> -OdfcShareUnc \\\\<storageaccount>.file.core.windows.net\\<odfc-share> -Execute",
+            "check": "Test-FslogixHostConfig reports the settings applied."
+          },
+          {
+            "title": "Sign in once and check the container",
+            "instructions": "Sign in to the host as a test user, sign out, then list the share.",
+            "command": "Get-ChildItem \\\\<storageaccount>.file.core.windows.net\\<profile-share> -Recurse -Filter *.vhdx",
+            "check": "A Profile VHDX (and ODFC VHDX) exists under the user's folder."
+          },
+          {
+            "title": "Publish redirections.xml",
+            "instructions": "Publish the exclusion file to the share so every host uses the same one.",
+            "command": "./automation/avd/fslogix/scripts/Publish-FslogixRedirections.ps1 -ProfileShareUnc \\\\<storageaccount>.file.core.windows.net\\<profile-share> -Execute",
+            "check": "redirections.xml is in the redirections folder of the share."
+          }
+        ],
+        "troubleshooting": [
+          "Temporary profile on sign-in: check the share path, the user's role on the share and the ticket (klist)."
+        ],
+        "cleanup": [
+          "Delete the test user's folder from the share."
+        ],
+        "repoPaths": [
+          "automation/avd/fslogix"
+        ]
+      }
+    },
+    {
+      "id": "a7-pipeline",
+      "title": "One repo, one config, three realms",
+      "section": "7",
+      "mode": "live",
+      "minutes": 1,
+      "followAlong": {
+        "level": "full",
+        "goal": "Preview a change to the AVD control plane without applying it.",
+        "needs": [
+          "The repo",
+          "An existing control-plane deployment or a test resource group"
+        ],
+        "steps": [
+          {
+            "title": "Run a what-if",
+            "instructions": "Change one parameter (for example the host pool session limit) and run what-if.",
+            "command": "az deployment group what-if -g <rg> --template-file automation/avd/control-plane/bicep/main.bicep --parameters <your parameter file>",
+            "check": "The output lists one modified property."
+          }
+        ],
+        "troubleshooting": [
+          "What-if shows noise: some properties are service-computed; compare only the properties you changed."
+        ],
+        "cleanup": [
+          "None; what-if creates nothing."
+        ],
+        "repoPaths": [
+          "automation/avd/control-plane"
+        ]
+      }
+    },
+    {
+      "id": "a8-1-state",
+      "title": "Crossing 1: three host pools, one workspace",
+      "section": "8",
+      "mode": "live+recorded",
+      "minutes": 1,
+      "followAlong": {
+        "level": "full",
+        "goal": "Check your host pools are healthy before testing portability.",
+        "needs": [
+          "Two host pools, one user group per pool"
+        ],
+        "steps": [
+          {
+            "title": "Check host status",
+            "instructions": "List session hosts and sessions.",
+            "command": "Get-AzWvdHostPool -ResourceGroupName <rg> | ForEach-Object { Get-AzWvdSessionHost -ResourceGroupName <rg> -HostPoolName $_.Name | Select-Object Name, Status, Session }",
+            "check": "All hosts Available with no sessions."
+          }
+        ],
+        "troubleshooting": [],
+        "cleanup": [
+          "None."
+        ],
+        "repoPaths": [
+          "automation/demo/avd/scripts/Show-AvdState.ps1"
+        ]
+      }
+    },
+    {
+      "id": "a8-2-entitlement",
+      "title": "Crossing 2: the user is entitled to the right realm",
+      "section": "8",
+      "mode": "live+recorded",
+      "minutes": 3,
+      "followAlong": {
+        "level": "full",
+        "goal": "Control which desktop a user sees with group membership.",
+        "needs": [
+          "Two application groups, each assigned to a different Entra group",
+          "A test user"
+        ],
+        "steps": [
+          {
+            "title": "Add the user to the first group",
+            "instructions": "Add the test user to the group assigned to the first application group.",
+            "command": "Add-AzADGroupMember -TargetGroupObjectId <group A id> -MemberUserPrincipalName <user>",
+            "check": "The user sees one desktop in Windows App."
+          },
+          {
+            "title": "Move the user to the second group",
+            "instructions": "Remove from group A and add to group B; refresh the feed.",
+            "command": "Remove-AzADGroupMember -GroupObjectId <group A id> -MemberUserPrincipalName <user>\nAdd-AzADGroupMember -TargetGroupObjectId <group B id> -MemberUserPrincipalName <user>",
+            "check": "After refresh the feed shows the second desktop only."
+          }
+        ],
+        "troubleshooting": [
+          "Feed unchanged: allow a few minutes, then refresh or sign out and in of Windows App."
+        ],
+        "cleanup": [
+          "Restore the original group membership."
+        ],
+        "repoPaths": [
+          "automation/demo/avd/scripts/Switch-UserHostPool.ps1"
+        ]
+      }
+    },
+    {
+      "id": "a8-3-portability",
+      "title": "Crossing 3: profile portability across realms",
+      "section": "8",
+      "mode": "live+recorded",
+      "minutes": 5,
+      "followAlong": {
+        "level": "full",
+        "goal": "Prove a profile follows a user across two host pools.",
+        "needs": [
+          "Two host pools using the same FSLogix share and configuration",
+          "A test user entitled to both pools (one at a time)"
+        ],
+        "steps": [
+          {
+            "title": "Create state in the profile",
+            "instructions": "Sign in to pool 1, create a file on the desktop and change a setting such as the wallpaper.",
+            "command": "",
+            "check": "File and setting present."
+          },
+          {
+            "title": "Sign out and confirm the container released",
+            "instructions": "Sign out; confirm no open handle on the container before signing in elsewhere.",
+            "command": "./automation/demo/avd/scripts/Test-ProfilePortability.ps1 -UserPrincipalName <user>",
+            "check": "The container shows a recent last write and no open handles."
+          },
+          {
+            "title": "Sign in to pool 2",
+            "instructions": "Sign in to the second pool.",
+            "command": "hostname",
+            "check": "The hostname belongs to pool 2 and the file and setting are present."
+          }
+        ],
+        "troubleshooting": [
+          "File missing: confirm OneDrive Known Folder Move is off so you are testing FSLogix, and that both pools use the same share path."
+        ],
+        "cleanup": [
+          "Delete the test file and restore the setting."
+        ],
+        "repoPaths": [
+          "automation/demo/avd/scripts/Test-ProfilePortability.ps1",
+          "automation/avd/fslogix"
+        ]
+      }
+    },
+    {
+      "id": "a8-4-failure",
+      "title": "Crossing 4: forced host failure on Hybrid",
+      "section": "8",
+      "mode": "live+recorded",
+      "minutes": 3,
+      "followAlong": {
+        "level": "full",
+        "goal": "See what a host failure does to a session and what survives.",
+        "needs": [
+          "A host pool with two Available hosts (VMs you can stop)",
+          "FSLogix profile on shared storage",
+          "A test user with a session"
+        ],
+        "steps": [
+          {
+            "title": "Start a session and leave an unsaved document open",
+            "instructions": "Sign in and open a document without saving it.",
+            "command": "",
+            "check": "The session is on host 1."
+          },
+          {
+            "title": "Stop host 1 hard",
+            "instructions": "Stop the VM without a graceful shutdown (for a Hyper-V VM: Stop-VM -TurnOff).",
+            "command": "Stop-VM -Name <host 1> -TurnOff",
+            "check": "The host shows Unavailable in the pool after a minute or two."
+          },
+          {
+            "title": "Open a new session",
+            "instructions": "Reconnect from Windows App; the broker sends you to host 2.",
+            "command": "hostname",
+            "check": "You are on host 2; your saved files and settings are present; the unsaved document is not."
+          },
+          {
+            "title": "Restart host 1",
+            "instructions": "Start the VM; AVD does not do this for you in a Hybrid realm.",
+            "command": "Start-VM -Name <host 1>",
+            "check": "The host returns to Available."
+          }
+        ],
+        "troubleshooting": [
+          "Profile will not attach: a stale handle on the container; wait for the SMB session to expire or close the handle on the share."
+        ],
+        "cleanup": [
+          "Ensure both hosts are Available."
+        ],
+        "repoPaths": [
+          "automation/demo/avd/scripts/Stop-SessionHost.ps1",
+          "automation/demo/avd/scripts/Restore-SessionHost.ps1"
+        ]
+      }
+    },
+    {
+      "id": "a8-5-monitoring",
+      "title": "Crossing 5: one monitoring layer",
+      "section": "8",
+      "mode": "live+recorded",
+      "minutes": 1,
+      "followAlong": {
+        "level": "full",
+        "goal": "Query all your hosts from one workspace.",
+        "needs": [
+          "Azure Monitor Agent on hosts reporting to one workspace"
+        ],
+        "steps": [
+          {
+            "title": "Run a heartbeat query",
+            "instructions": "Show the last heartbeat per host.",
+            "command": "Heartbeat | where TimeGenerated > ago(1h) | summarize last = max(TimeGenerated) by Computer | order by Computer asc",
+            "check": "Every host you expect, with a recent last heartbeat."
+          }
+        ],
+        "troubleshooting": [
+          "Missing host: check the Azure Monitor Agent and the DCR association."
+        ],
+        "cleanup": [
+          "None."
+        ],
+        "repoPaths": [
+          "handouts/Deployment_Checklist.md"
+        ]
+      }
+    }
+  ]
+}
