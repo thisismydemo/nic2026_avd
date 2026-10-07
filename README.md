@@ -14,7 +14,7 @@ This repository accompanies a session that shows one AVD workspace with three ho
 
 ## Start here
 
-1. Open the [follow-along site](https://thisismydemo.github.io/nic2026_avd/) (it goes live once GitHub Pages is switched on for this repository), or read the same content in [follow-along/README.md](follow-along/README.md).
+1. Open the [follow-along site](https://thisismydemo.cloud/nic2026_avd/) (GitHub Pages, built by the workflow in this repository), or read the same content in [follow-along/README.md](follow-along/README.md).
 2. Read the handouts in [handouts/](handouts/).
 3. Read [automation/README.md](automation/README.md) for the run order, configuration and tests of the deployment automation.
 
