@@ -1,327 +1,120 @@
-# Identity Reference Architecture - AVD Anywhere
-
-## Overview
-
-This guide explains the identity architecture that enables Azure Virtual Desktop to work seamlessly across three distinct deployment models: Azure, Azure Local, and AVD Hybrid (on-premises with Windows Server, VMware vSphere, or Nutanix AHV).
-
-The core principle: **One identity model, three deployment patterns.**
-
-## Architecture Layers
-
-### Layer 1: Entra ID (Microsoft Entra) - The Central Identity Authority
-
-All three deployment models rely on **Microsoft Entra ID (formerly Azure AD)** as the authoritative identity source:
-
-- **User accounts** - Managed in Entra ID
-- **Group membership** - Application and session host assignment
-- **Conditional access** - Security policies apply uniformly
-- **MFA enforcement** - Multi-factor authentication across all models
-- **Application sign-on** - Single sign-on (SSO) to applications running in session
-
-#### Why Entra ID First?
-- Native to Azure (obviously)
-- Hybrid-capable with on-premises AD via Azure AD Connect
-- Supports seamless sign-on across cloud and on-premises resources
-- Built-in Conditional Access and identity governance
-
----
-
-## Deployment Model Identity Patterns
-
-### Pattern 1: AVD on Azure
-
-**Architecture:**
-```
-Entra ID
-    ↓
-Azure (Entra ID joined VMs)
-    ↓
-AVD Session Hosts
-    ↓
-FSLogix profiles via Azure Files (Kerberos auth)
-```
-
-**Identity Flow:**
-1. User authenticates to Entra ID
-2. Token obtained from Entra ID
-3. AVD control plane validates user against Entra ID
-4. Session redirected to appropriate host pool
-5. FSLogix profile retrieved from Azure Files using Kerberos (Entra ID integrated)
-
-**Key Characteristics:**
-- VMs are **Entra ID joined** (not domain-joined to on-premises AD)
-- No on-premises domain controller dependency
-- Azure Files integration uses Entra ID Kerberos authentication
-- Cleanest cloud-native approach
-
-**Configuration Checklist:**
-- [ ] VMs joined to Entra ID during deployment
-- [ ] Azure Files storage account configured for Entra ID authentication
-- [ ] FSLogix container paths set to Azure Files UNC paths
-- [ ] Conditional Access policies in place
-
----
-
-### Pattern 2: AVD on Azure Local
-
-**Architecture:**
-```
-Entra ID
-    ↓
-Azure Local (Arc-connected VMs)
-    ↓
-AVD Session Hosts
-    ↓
-FSLogix profiles via CSV or SMB (Local AD or Entra ID)
-```
-
-**Identity Flow:**
-1. User authenticates to Entra ID
-2. AVD control plane (in Azure) validates user against Entra ID
-3. Session directed to Azure Local cluster
-4. Session host resolves user identity locally (via Arc integration)
-5. FSLogix profile retrieved from cluster storage (CSV) or SMB share
-
-**Key Considerations:**
-- Azure Local clusters can use **Local Identity** (new, password-less) or **Active Directory**
-- Arc Resource Bridge connects Azure Local back to Azure/Entra ID
-- FSLogix storage can be on cluster CSV or external SMB (for redundancy)
-- Hybrid identity: Entra ID for session access, Local AD or Local Identity for resource access
-
-**Two Sub-Patterns:**
-
-#### Sub-Pattern 2a: Local Identity (Recommended for new deployments)
-- Azure Local uses built-in Local Identity (no on-premises AD required)
-- Entra ID for user sign-on
-- Arc integration enables Azure-based management
-- Password-less, certificate-based authentication
-
-#### Sub-Pattern 2b: Active Directory Integrated (On-premises AD)
-- Azure Local joined to on-premises AD domain
-- Entra ID for AVD control plane access
-- Entra ID Connect or similar for directory sync
-- More complex but allows on-premises AD policies
-
-**Configuration Checklist:**
-- [ ] Azure Local cluster Arc-connected to Azure
-- [ ] Local Identity initialized or AD domain configured
-- [ ] FSLogix profile storage on CSV or external SMB
-- [ ] Entra ID Conditional Access policies configured
-- [ ] Arc agents deployed for monitoring
-
----
-
-### Pattern 3: AVD Hybrid (On-Premises Hypervisors)
-
-**Architecture:**
-```
-Entra ID
-    ↓
-Windows Server / vSphere / Nutanix (On-premises)
-    ↓
-AVD Agent (Hybrid mode)
-    ↓
-FSLogix profiles via on-prem storage
-    ↓
-Arc connectivity back to Azure/Entra ID
-```
-
-**Identity Flow:**
-1. User authenticates to Entra ID (or on-premises AD with Entra ID sync)
-2. AVD control plane (in Azure) routes to on-premises session host
-3. Session host may use local AD or Entra ID (via Arc)
-4. FSLogix profile retrieved from on-premises storage (SMB, NAS, platform-native)
-5. Arc agent on session host reports back to Azure for monitoring
-
-**Three Hypervisor Sub-Patterns:**
-
-#### Sub-Pattern 3a: Windows Server Hyper-V
-- Session hosts run on Windows Server with Hyper-V role
-- VMs domain-joined to on-premises Active Directory
-- Optional: Arc enablement for Azure monitoring
-- FSLogix on SMB scale-out file server or local NAS
-
-#### Sub-Pattern 3b: VMware vSphere
-- Session hosts are vSphere VMs
-- Domain-joined to on-premises AD (via vSphere AD plugin or traditional domain)
-- Arc enablement via Arc-enabled servers
-- FSLogix on vSAN, external SMB, or NAS
-
-#### Sub-Pattern 3c: Nutanix AHV
-- Session hosts are Nutanix VMs
-- Domain-joined to on-premises AD
-- Arc enablement for Azure governance
-- FSLogix on Nutanix Files, external SMB, or NAS
-
-**Key Characteristics:**
-- Session hosts remain on-premises
-- On-premises Active Directory for local resource access
-- Entra ID for cloud-based access (AVD control plane)
-- Arc integration bridges on-prem and cloud identity contexts
-- Network connectivity to Azure required (ExpressRoute recommended)
-
-**Configuration Checklist:**
-- [ ] Session hosts domain-joined to on-premises AD
-- [ ] Entra ID Connect (or similar) syncing users to cloud
-- [ ] Arc-enabled servers configured and registered
-- [ ] Firewall/network access to Entra ID endpoints
-- [ ] FSLogix profile storage accessible from session hosts
-
----
-
-## Cross-Model Identity Patterns
-
-### 1. Profile Portability Between Models
-
-**Challenge:** A user should be able to move between Azure, Azure Local, and Hybrid deployment models without losing their profile or application state.
-
-**Solution:**
-- **FSLogix Design:** Store profiles in a portable format and storage technology that all three models can access
-- **Option A:** All profiles in Azure Files (requires network access from on-prem; not always feasible)
-- **Option B:** Profiles stored per-deployment but synchronized (more complex)
-- **Option C:** Unique profiles per model but configured identically (simplest)
-
-**Recommended Approach:**
-Use **portable FSLogix configuration files** that specify profile paths relative to the deployment model:
-```
-Azure: \\<storage-account>.file.core.windows.net\fslogix
-Azure Local: \\<csv-path>\fslogix or \\<smb-server>\fslogix
-Hybrid: \\<on-prem-nas>\fslogix
-```
-
-All use **identical FSLogix profile containers**, just different UNC paths based on deployment.
-
-### 2. Unified Monitoring via Arc and Entra ID
-
-**Challenge:** Monitor users and sessions across all three deployment models from a single Azure dashboard.
-
-**Solution:**
-- Deploy Arc agents on all session hosts (even Azure Local and Hybrid)
-- Collect logs to Azure Log Analytics
-- Use Azure Monitor for unified telemetry
-- Map sessions back to Entra ID users for consistent reporting
-
-### 3. Conditional Access Policies
-
-**Challenge:** Apply consistent security policies across all deployment models.
-
-**Solution:**
-- Entra ID Conditional Access policies apply to AVD sign-on (all models)
-- Policies enforce MFA, device compliance, location-based rules
-- Session hosts inherit policies based on user's Entra ID posture
-
----
-
-## Identity Security Best Practices
-
-### Across All Models:
-1. **Enable MFA** - Require multi-factor authentication at Entra ID level
-2. **Conditional Access** - Block sign-on from unexpected locations or non-compliant devices
-3. **Session Host Hardening** - Restrict RDP/console access; use Just-In-Time (JIT) access
-4. **Profile Encryption** - Ensure FSLogix containers are encrypted at rest and in transit
-5. **RBAC** - Use Azure Role-Based Access Control for session host/pool management
-
-### Azure-Specific:
-- Use Entra ID-only (no domain join) when possible
-- Enable Azure Files Entra ID Kerberos authentication
-- Disable NTLM if not required
-
-### Azure Local-Specific:
-- Use Local Identity if not requiring on-premises AD
-- Enable Arc for centralized identity governance
-- Audit Local Identity certificate rotation
-
-### Hybrid-Specific:
-- Ensure on-premises AD is secure (Tier 0 protection)
-- Use Arc with Managed Identity for session host authentication
-- Implement network segmentation (ExpressRoute, firewall rules)
-- Regularly audit on-premises directory sync
-
----
-
-## Decision Tree: Which Model for Your Organization?
-
-```
-Start: Do you have on-premises infrastructure?
-├─ NO → Go to Azure
-│   └─ Start with Entra ID-joined, Azure Files, FSLogix
-│       └─ Simplest path; cloud-native identity
-│
-└─ YES → Do you need Azure Local (AI/ML, Edge)?
-    ├─ NO → Use Hybrid (Hyper-V/vSphere/Nutanix)
-    │   └─ Session hosts on-prem, Arc for monitoring
-    │   └─ FSLogix on existing on-premises storage
-    │
-    └─ YES → Use Azure Local
-        └─ New cluster deployed; choose Local Identity or AD
-        └─ FSLogix on cluster CSV or SMB
-        └─ Arc integration for Azure management
-```
-
----
-
-## Configuration Examples
-
-### Example 1: Azure + Entra ID + Azure Files
-
-```bicep
-// Identity: Entra ID
-// Session Hosts: Entra ID joined
-// FSLogix Storage: Azure Files with Entra ID Kerberos
-// No on-premises components required
-```
-
-### Example 2: Azure Local + Local Identity + Cluster CSV
-
-```bicep
-// Identity: Local Identity (Azure Local built-in)
-// Session Hosts: Azure Local VMs, Arc-connected
-// FSLogix Storage: Cluster CSV (built-in redundancy)
-// Simplified, no on-premises AD needed
-```
-
-### Example 3: Hybrid + On-Premises AD + Entra ID Sync + SMB
-
-```powershell
-// Identity: On-premises AD (source), Entra ID (sync)
-// Session Hosts: Windows Server Hyper-V, domain-joined
-// FSLogix Storage: SMB scale-out file server
-// FSLogix user credentials: On-premises AD accounts
-// Arc agents report to Azure for monitoring
-```
-
----
-
-## Common Questions
-
-**Q: Can I mix identity models in the same workspace?**
-A: Yes! You can have some host pools Entra ID-only, others AD-joined. Users see one workspace; they just connect to the appropriate pool.
-
-**Q: What if my on-premises AD is unavailable?**
-A: If you're purely on Azure or use Azure Local with Local Identity, no on-prem dependency. Hybrid deployments need on-prem AD; use BCP/failover strategies.
-
-**Q: Do I need to sync on-premises AD to Entra ID?**
-A: For hybrid, yes (via Azure AD Connect). For Azure-only, no. For Azure Local with on-prem AD, yes.
-
-**Q: Can FSLogix profiles move between models?**
-A: If configured identically, yes. Different storage paths, same profile structure. Not automatic; requires planning.
-
----
-
-## Summary
-
-| Model | Identity Source | Storage | Complexity | On-Prem Dependency |
-|-------|-----------------|---------|------------|-------------------|
-| **Azure** | Entra ID only | Azure Files | Low | None |
-| **Azure Local** | Local Identity or AD | Cluster CSV | Medium | Optional (AD) |
-| **Hybrid** | On-prem AD + Entra ID | On-prem SMB/NAS | High | Required |
-
-**Remember:** All three models use Entra ID as the access control layer. The identity *architecture* changes; the access *model* stays consistent.
-
----
-
-## Next Steps
-
-1. Read the Deployment Checklist to validate your identity setup
-2. Review FSLogix_Configuration_Guide.md for storage integration details
-3. Check Q&A_Resources.md for specific platform configurations
+# Azure Virtual Desktop: Identity Reference Architecture
+
+A reference for tracing identity from user sign-in through session-host access to an Azure Files profile share.
+
+**Status:** prepared 2026-10-06 against Microsoft Learn; identity support changes by release and region, so re-check the linked documentation before you design.
+
+![Identity: three paths, one proof](Identity_Three_Paths.png)
+
+## The three paths
+
+The same user follows three paths and receives three different tokens; no password is typed.
+
+1. **User to service.** The user signs in to Microsoft Entra ID from Windows App and gets a token for the Azure Virtual Desktop service, which returns the feed.
+2. **User to host.** With single sign-on enabled, the user authenticates to the session host with a Microsoft Entra token issued through the Windows Cloud Login application, instead of typing credentials.
+3. **Host, as the user, to the share.** The session host asks Microsoft Entra ID for a Kerberos ticket for the storage account (`cifs/<storageaccount>.file.core.windows.net`; with Microsoft Entra Kerberos the ticket encryption is always AES-256) and mounts the profile share over SMB. The share then enforces share-level RBAC plus NTFS ACLs per user folder.
+
+A proof you can show: run `klist get cifs/<storageaccount>.file.core.windows.net`, then `klist` inside the session. It lists a cifs ticket from the Entra realm.
+
+## Building blocks
+
+**User identities**
+
+- **Cloud-only:** created and managed only in Microsoft Entra ID. For Azure Files with Microsoft Entra Kerberos this is labelled preview in parts of Microsoft Learn (see the Azure Files section).
+- **Hybrid:** AD DS identities synced to Microsoft Entra ID with Microsoft Entra Connect Sync or Microsoft Entra Cloud Sync.
+- **External identities:** single sign-on must be enabled on the host pool, and Azure Files support for external identities is limited to FSLogix scenarios on Azure Virtual Desktop in the public cloud.
+
+**Session hosts and access**
+
+- Session hosts can be Microsoft Entra joined, hybrid joined or AD DS joined, depending on the deployment model (next section).
+- Users need an eligible licence.
+- On Microsoft Entra-joined session hosts, assign the Virtual Machine User Login role to users, and the Virtual Machine Administrator Login role to admins, on the VM or its resource group. A missing role gives the error "Your account is configured to prevent you from using this device".
+
+## Join type by deployment model
+
+| Model | Allowed join types | Notes |
+|---|---|---|
+| Azure | Microsoft Entra join with single sign-on; AD DS join and hybrid join are also supported | |
+| Azure Local | AD DS join (including Microsoft Entra hybrid join) through the Azure Virtual Desktop portal; native Microsoft Entra join through PowerShell and other deployment methods | The portal can only add session hosts to an AD DS domain. Each host pool contains only Azure session hosts or only Azure Local session hosts. |
+| Azure Virtual Desktop Hybrid | Windows client hosts: Microsoft Entra joined, AD DS joined or hybrid joined. Windows Server hosts: AD DS joined or hybrid joined | Entra-only join is not supported for Windows Server because of the Remote Desktop Services licensing server dependency. Windows multi-session editions are not supported on Hybrid. |
+
+## Single sign-on and Conditional Access
+
+Enabling single sign-on is five tasks:
+
+1. Enable Microsoft Entra authentication for RDP.
+2. Hide the consent prompt dialog.
+3. Create a Kerberos server object if AD DS is part of the environment. It is required when a session host is hybrid joined, and when a session host is Microsoft Entra joined, domain controllers exist and users must reach on-premises resources such as SMB shares.
+4. Review Conditional Access policies.
+5. Configure the host pool for single sign-on.
+
+Two Microsoft Entra applications are involved when single sign-on is on: **Azure Virtual Desktop** (feed subscription and gateway sign-in) and **Windows Cloud Login** (session host sign-in). Keep their Conditional Access policies aligned, or users see unexpected prompts. Verify in the Microsoft Entra sign-in logs that both applications show Success and the expected policy.
+
+Cautions:
+
+- Do not put the Azure Virtual Desktop Azure Resource Manager Provider application in any Conditional Access policy.
+- Do not block the Windows 365 application: Windows App authenticates to it too.
+- Disable legacy per-user MFA and use Conditional Access only.
+- The Every time sign-in frequency is supported only on the Windows Cloud Login application.
+- A device-compliance requirement on All cloud apps can block Microsoft Entra-joined session hosts, so scope such policies.
+- If single sign-on is not enabled, Conditional Access for VM sign-in targets the Microsoft Azure Windows Virtual Machine Sign-in application.
+
+## Azure Files and FSLogix identity
+
+| Identity source | Fits | Note |
+|---|---|---|
+| AD DS | Clients that can reach domain controllers | Sync identities to Microsoft Entra ID for share permissions. |
+| Microsoft Entra Domain Services | Cloud-only or hybrid identities; clients joined to the managed domain | |
+| Microsoft Entra Kerberos | Cloud-first or hybrid; Microsoft Entra-joined clients; FSLogix; clients need no domain controller connectivity | Exclude the storage account application from MFA Conditional Access policies. For cloud-only identities, manage file and directory permissions with the Azure portal or RestSetAcls; editing permissions in File Explorer is not supported for them. |
+
+A storage account uses only one identity source. Hybrid identities with Microsoft Entra Kerberos work in all clouds; cloud-only identities are supported in public cloud regions only. Microsoft Learn is not consistent about the status of cloud-only identities: the Microsoft Entra Kerberos introduction and the Azure Files what's-new page label the support as preview, while the Azure Files setup article describes it without a label. Treat it as preview and confirm the current status before you rely on it.
+
+Microsoft Entra Kerberos setup:
+
+1. Enable it on the storage account.
+2. Grant admin consent to the generated application (`openid`, `profile` and `User.Read`).
+3. Exclude that application from MFA policies.
+4. Assign share-level permissions.
+5. Configure directory and file permissions. For hybrid identities, File Explorer or `icacls` needs a device that can reach a domain controller.
+6. On every client, set `CloudKerberosTicketRetrievalEnabled` to `1`: with the Intune settings catalog (not OMA-URI, which does not work on multi-session), Group Policy or the registry.
+7. For FSLogix, also set `LoadCredKeyFromProfile` to `1` under the `AzureADAccount` policy key.
+8. For cloud-only identities, add the `kdc_enable_cloud_group_sids` tag to the application manifest. A Kerberos ticket can carry at most 1,010 group SIDs.
+9. Make sure the services `WinHttpAutoProxySvc` and `iphlpsvc` are running.
+
+Two warnings from Microsoft Learn. A Windows update in April 2026 changes the default Kerberos encryption type from RC4 to AES-SHA1; file shares that host FSLogix containers must be upgraded to AES-SHA1 first, or access can fail. And error 1327 on `net use` means the storage application was not excluded from MFA.
+
+## Azure Local cluster identity is a separate question
+
+The Azure Local cluster's own identity model, for example Local Identity with Key Vault or AD DS, decides how the cluster nodes trust each other. It is chosen in the infrastructure plan and does not decide how users or session hosts authenticate. Session hosts on Azure Local can be Microsoft Entra joined or AD joined, whichever cluster identity you chose.
+
+Local Identity with Key Vault is not passwordless: it needs a local administrator on the nodes and a Key Vault for the recovery secrets.
+
+## Choosing a model
+
+| Situation | Start with |
+|---|---|
+| Cloud-first, Windows client session hosts | Microsoft Entra-joined hosts, cloud-only or hybrid users, and Microsoft Entra Kerberos for profiles |
+| Existing AD DS and Windows Server session hosts | AD DS or hybrid join, and AD DS authentication on Azure Files (or Microsoft Entra Kerberos for hybrid identities) |
+| Azure Local or Hybrid hosts that must reach on-premises resources | Hybrid join, plus a Kerberos server object when single sign-on is on |
+
+## Common questions
+
+- **Do I need AD DS?** Not for Microsoft Entra-joined Windows client hosts with Microsoft Entra Kerberos. Windows Server hosts need AD DS or hybrid join.
+- **Why do users see two prompts?** The two Conditional Access applications are not aligned, or per-user MFA is on.
+- **Does MFA apply to the file share?** No. Exclude the storage account application; MFA happens at sign-in.
+- **Can external users use it?** Single sign-on is required, and Azure Files support is limited to FSLogix on Azure Virtual Desktop.
+- **Why can a user see the feed but not open the host?** The Virtual Machine User Login role may be missing, or the Windows Cloud Login application may be blocked.
+- **Is the cluster identity the same as user identity?** No.
+
+## Checklist
+
+- [ ] Users and groups exist (cloud-only or synced).
+- [ ] Eligible licences are assigned.
+- [ ] The join type is chosen per deployment model.
+- [ ] Roles are assigned on Microsoft Entra-joined hosts.
+- [ ] Single sign-on is configured.
+- [ ] Conditional Access covers both applications.
+- [ ] Per-user MFA is disabled.
+- [ ] The Azure Files identity source is chosen and enabled once.
+- [ ] The storage application is consented and excluded from MFA.
+- [ ] Client Kerberos settings are deployed.

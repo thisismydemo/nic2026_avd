@@ -1,466 +1,150 @@
-# FSLogix Configuration Guide - AVD Anywhere
+# Azure Virtual Desktop: FSLogix Configuration Guide
 
-## What is FSLogix?
+This handout summarizes FSLogix profile container configuration choices for the three Azure Virtual Desktop deployment models.
 
-FSLogix is Microsoft's solution for managing user profiles and application containers in virtual desktop environments. Instead of storing profiles locally on session hosts, FSLogix redirects profiles to a centralized location, providing:
+**Status:** prepared 2026-10-06 against Microsoft Learn; check the FSLogix and Azure Files documentation for your versions before you deploy.
 
-- **Profile Portability** - Users get the same profile regardless of session host
-- **Reduced Session Host Footprint** - Profiles stored centrally, not on each VM
-- **Rapid Deployment** - No profile initialization delay
-- **Application Layering** - Application containers isolated from user profiles
+## What a profile container is
 
-## Profile Container Architecture
+FSLogix stores the whole user profile in a VHD or VHDX file on an SMB share. The container is attached when the user signs in and detached when the user signs out, so pooled session hosts stay stateless. With the default `ProfileType` of `0`, one connection mounts the container at a time.
 
-**Traditional (Local) Profile:**
-```
-Session Host VM
-├── User Profile (C:\Users\username)
-│   ├── Documents
-│   ├── Desktop
-│   ├── AppData\Roaming (app settings)
-│   └── AppData\Local (temp, cache)
-└── Lost when user logs off or VM is replaced
-```
+Antivirus exclusions for FSLogix are a prerequisite; see the FSLogix prerequisites page for them.
 
-**FSLogix Profile Container:**
-```
-FSLogix Profile Container (VHD/VHDX)
-├── User Profile (C:\Users\username)
-│   ├── Documents
-│   ├── Desktop
-│   ├── AppData\Roaming
-│   └── AppData\Local
-│
-Stored on Central Storage (Azure Files / SMB / NAS)
-├── Portable across all session hosts
-├── Survives session host replacement
-└── Attached via FSLogix driver on sign-on
-```
+## Where the container lives in each deployment model
 
-## Three Deployment Models = Three Storage Paths
+| Model | Profile storage | Note |
+|---|---|---|
+| Azure | Azure Files, with Microsoft Entra Kerberos, AD DS or Microsoft Entra Domain Services identity | |
+| Azure Local | An SMB service: a file server VM or Scale-Out File Server on the cluster, or Azure Files | FSLogix needs an SMB service, not a cluster shared volume path. |
+| Azure Virtual Desktop Hybrid | Any SMB path: Azure Files with Microsoft Entra Kerberos, or on-premises SMB with AD DS Kerberos | |
 
-### Model 1: Azure Deployment Storage
+Microsoft Learn notes that keeping profiles on the Azure Local instance's own storage gives low latency and a simpler design, but it may limit scalability compared with a separate file share, it suits smaller deployments, and it raises the capacity and performance demand on the cluster. All-flash storage (SSD or NVMe) is preferable to hybrid storage for this approach.
 
-**Storage Technology:** Azure Files (SMB 3.1.1 over HTTPS)
+## Standard configuration
 
-**Advantages:**
-- Managed by Azure; no on-premises storage infrastructure
-- Azure Files native encryption at rest
-- Auto-scaling; no capacity planning
-- Built-in redundancy (LRS, GRS, GZRS options)
-- Entra ID Kerberos authentication (native identity integration)
+The registry key is `HKEY_LOCAL_MACHINE\SOFTWARE\FSLogix\Profiles`.
 
-**FSLogix Configuration:**
-```
-VHDLocations = \\<storage-account>.file.core.windows.net\<share>\<path>
-CloudCacheLocations = <optional for performance>
-IsDynamic = 1  (containers expand as needed)
-```
+| Name | Type | Value | Purpose |
+|---|---|---:|---|
+| `Enabled` | DWORD | `1` | Required. |
+| `DeleteLocalProfileWhenVHDShouldApply` | DWORD | `1` | Recommended, so users do not use local profiles and lose data. |
+| `FlipFlopProfileDirectoryName` | DWORD | `1` | Recommended; makes container folders easier to browse. |
+| `LockedRetryCount` | DWORD | `3` | Recommended; faster failure. |
+| `LockedRetryInterval` | DWORD | `15` | Recommended; faster failure. |
+| `ProfileType` | DWORD | `0` | Default; single connection. |
+| `ReAttachIntervalSeconds` | DWORD | `15` | Recommended; faster failure. |
+| `ReAttachRetryCount` | DWORD | `3` | Recommended; faster failure. |
+| `SizeInMBs` | DWORD | `30000` | Default container size. |
+| `VHDLocations` | MULTI_SZ or REG_SZ | SMB path | The profile container location. |
+| `VolumeType` | REG_SZ | `VHDX` | Recommended; supports a larger size and has fewer corruption cases than VHD. |
 
-**Authentication:**
-```
-# Azure Files supports Entra ID Kerberos
-# Session host must be Entra ID-joined
-# No additional credentials needed (transparent auth)
-```
+Notes:
 
-**Example Configuration:**
-```
-Storage Account: avdprofiles.file.core.windows.net
-Share: fslogix-profiles
-Path: \\avdprofiles.file.core.windows.net\fslogix-profiles\Profile
-```
+- Before you enable `DeleteLocalProfileWhenVHDShouldApply`, make sure users saved their data outside the local profile. Existing local profiles are not removed automatically without it.
+- Changing `FlipFlopProfileDirectoryName` in an existing environment can give users new profiles.
+- Example path for `VHDLocations`: `\\<storage-account-name>.file.core.windows.net\<share-name>`.
+- This standard configuration has one VHD location, one profile container, no Office Data and Files Container, no concurrent connections and no custom redirections. Object-specific `VHDLocations` (per user or group SID) exist for advanced layouts.
 
----
+Example PowerShell for the Profiles key:
 
-### Model 2: Azure Local Deployment Storage
-
-**Storage Technology:** Cluster CSV (Cluster Shared Volume) or SMB scale-out file server
-
-**Advantages (CSV):**
-- Built into Azure Local; no external dependency
-- High performance (local cluster network)
-- Integrated backup/replication
-- No redundant network hops
-
-**Advantages (SMB Scale-out):**
-- External NAS for independence
-- Redundancy across storage controllers
-- Can be shared with other workloads
-
-**FSLogix Configuration (CSV):**
-```
-VHDLocations = \\<cluster-name>\ClusterStorage$\fslogix-profiles
-CloudCacheLocations = <optional>
-IsDynamic = 1
-```
-
-**FSLogix Configuration (SMB Scale-out):**
-```
-VHDLocations = \\<smb-server>\fslogix-profiles
-CloudCacheLocations = <optional>
-IsDynamic = 1
-```
-
-**Authentication:**
-- CSV: Cluster identity (internal, transparent)
-- SMB: Local Identity or on-premises AD credentials
-
-**Example Configuration:**
-```
-Cluster CSV:
-\\azurelocal-cluster\ClusterStorage$\fslogix\Profile
-
-External SMB:
-\\smb-scale-out.internal\fslogix-profiles\Profile
-```
-
----
-
-### Model 3: Hybrid Deployment Storage
-
-**Storage Technology:** On-premises NAS, SMB scale-out, or platform-native (vSAN, Nutanix Files)
-
-**Advantages:**
-- Uses existing on-premises storage infrastructure
-- No Azure dependency for profile storage
-- Can leverage existing backup/replication
-- Works with Windows Server, VMware, Nutanix
-
-**Sub-Options:**
-
-**Option 3a: SMB Scale-out File Server**
-```
-VHDLocations = \\<smb-server>\fslogix-profiles
-CloudCacheLocations = <local cache on session host>
-IsDynamic = 1
-```
-
-**Option 3b: Third-Party NAS (NetApp, Isilon, etc.)**
-```
-VHDLocations = \\<nas-ip-or-name>\fslogix
-CloudCacheLocations = <local cache>
-IsDynamic = 1
-```
-
-**Option 3c: VMware vSAN**
-```
-# vSAN presented as SMB via scale-out file server or Hyper-Converged setup
-VHDLocations = \\<vsan-smb-endpoint>\fslogix-profiles
-```
-
-**Option 3d: Nutanix Files**
-```
-VHDLocations = \\<nutanix-files-endpoint>\fslogix-profiles
-CloudCacheLocations = <local cache>
-IsDynamic = 1
-```
-
-**Authentication:**
-- On-premises Active Directory credentials for SMB access
-- Service account with permissions to profile shares
-
-**Example Configuration:**
-```
-NAS SMB:
-\\nas.internal.company.com\fslogix-profiles\Profile
-
-Nutanix Files:
-\\nutanix-files.internal\fslogix-profiles\Profile
-
-vSAN SMB:
-\\vsphere-smb-endpoint\fslogix-profiles\Profile
-```
-
----
-
-## FSLogix Configuration File Locations
-
-### Windows Server (Hyper-V, Remote Desktop Services)
-```
-Group Policy: Computer Configuration\Policies\Administrative Templates\FSLogix\Profile Containers
-Registry (if not using GPO): HKLM\Software\FSLogix\Profiles
-```
-
-### Azure / Azure Local Session Hosts
-```
-Group Policy (same as above): Computer Configuration\Policies\Administrative Templates\FSLogix\Profile Containers
-OR
-Configuration via Custom Script Extension or Template
-```
-
-### Key Configuration Options
-
-```
-VHDLocations = <path to profile storage>
-        # UNC path to FSLogix profile storage
-
-Enabled = 1
-        # Enable FSLogix profile containers
-
-IsDynamic = 1
-        # Containers expand as needed (vs. fixed size)
-
-VolumeType = VHDX
-        # Use VHDX format (supports larger profiles)
-
-DeleteLocalProfileWhenVHDShouldApply = 1
-        # Remove local profile when FSLogix container detected
-        # Prevents profile sync issues
-
-FlipFlopDirectoryName = 0
-        # Profile naming: Set to 1 if using flip-flop naming scheme
-
-CloudCacheLocations = <optional local cache path>
-        # Local cache on session host for performance
-        # Especially useful for Hybrid/remote deployments
-```
-
----
-
-## Storage Performance Considerations
-
-### Azure Files Performance
-- **Typical:** 60 Mbps (SMB 3.0, standard tier)
-- **Premium:** 100 Mbps+ (premium tier, higher cost)
-- **Optimization:** Use Cloud Cache for frequently accessed profiles
-- **Network:** Ensure sufficient bandwidth from session hosts to Azure
-
-**Cloud Cache for Azure:**
-```
-CloudCacheLocations = C:\FSLogix-Cache
-        # 15-30 GB local SSD for cache
-        # Profiles cached locally; synced to Azure Files periodically
-```
-
-### Azure Local Performance
-- **CSV (Local):** 500+ Mbps (cluster network, excellent)
-- **SMB Scale-out:** 200-400 Mbps (depends on NIC/switch)
-- **Optimization:** CSV preferred for performance; SMB for redundancy
-
-### Hybrid Performance
-- **On-premises NAS:** Varies (typically 100-400 Mbps)
-- **vSAN:** 200-500 Mbps (cluster network dependent)
-- **Nutanix Files:** 200-500 Mbps
-- **Optimization:** Local Cloud Cache essential for remote locations
-  ```
-  CloudCacheLocations = C:\FSLogix-Cache or D:\FSLogix-Cache
-  ```
-
----
-
-## Sizing Guide: Storage Capacity
-
-### Profile Container Sizes
-
-**Light User** (minimal documents, small AppData):
-- 2-5 GB per profile
-
-**Standard User** (typical documents, moderate AppData):
-- 5-15 GB per profile
-
-**Power User** (large documents, many applications):
-- 15-30 GB per profile
-
-**Calculation:**
-```
-Total Storage = (Number of Users × Average Profile Size) × Growth Factor (1.3 for 30% overhead)
-
-Example:
-1000 users × 10 GB avg × 1.3 = 13 TB total storage required
-```
-
-### Storage Redundancy
-
-**Azure Files:**
-- LRS (Local Redundant Storage): 1x replication (within region)
-- GRS (Geo-Redundant Storage): 2x replication (across regions)
-- Recommended: GRS for critical deployments
-
-**Azure Local:**
-- CSV: Built-in cluster replication
-- SMB Scale-out: RAID-based redundancy
-
-**Hybrid:**
-- NAS: RAID-6 or similar (double fault tolerance)
-- vSAN: Ensure adequate cluster size (minimum 3 nodes)
-- Nutanix: Native redundancy (RF2 or RF3)
-
----
-
-## Troubleshooting Common FSLogix Issues
-
-### Issue: Profile Not Loading
-
-**Symptoms:**
-- User logs in with temporary profile
-- FSLogix driver not attaching container
-
-**Diagnostics:**
 ```powershell
-# Check FSLogix service
-Get-Service -Name FSLogix | Select-Object Status, StartType
-
-# Check event logs
-Get-WinEvent -LogName "System" | Where-Object {$_.ProviderName -match "FSLogix"}
-
-# Verify storage path accessibility
-Test-NetConnection -ComputerName <storage-server> -Port 445
-
-# Check file permissions
-icacls "\\<storage-path>"
+$key = 'HKLM:\SOFTWARE\FSLogix\Profiles'
+New-Item -Path $key -Force | Out-Null
+New-ItemProperty -Path $key -Name Enabled -PropertyType DWord -Value 1 -Force
+New-ItemProperty -Path $key -Name VHDLocations -PropertyType String -Value '\\<storage-account-name>.file.core.windows.net\<share-name>' -Force
+New-ItemProperty -Path $key -Name VolumeType -PropertyType String -Value 'VHDX' -Force
+New-ItemProperty -Path $key -Name FlipFlopProfileDirectoryName -PropertyType DWord -Value 1 -Force
+New-ItemProperty -Path $key -Name DeleteLocalProfileWhenVHDShouldApply -PropertyType DWord -Value 1 -Force
 ```
 
-**Solutions:**
-1. Verify network connectivity to storage
-2. Check storage path permissions (user/service account needs Full Control)
-3. Verify FSLogix service running on session host
-4. Check disk space on storage and session host
-5. Review FSLogix event logs for specific errors
+## Storage permissions
 
-### Issue: Slow Profile Loading
+SMB permissions use NTFS ACLs: only the user (CREATOR OWNER) should have access to their profile folder, and administrators need Full Control.
 
-**Symptoms:**
-- Prolonged login time (>30 seconds)
-- High disk I/O during profile attach
+| Principal | Permission | Applies to |
+|---|---|---|
+| CREATOR OWNER | Modify | Subfolders and files only |
+| Administrative group | Full Control | This folder, subfolders and files |
+| Users group | Modify | This folder only, so users can create their folder |
 
-**Diagnostics:**
-```powershell
-# Monitor profile size
-Get-ChildItem -Path "\\<storage-path>" | Sort-Object Length -Descending | Select-Object Name, @{N="SizeGB";E={$_.Length/1GB}} | Head -10
+For Azure Files:
 
-# Check network latency
-Measure-NetLatency -ComputerName <storage-server>
+- Assign share-level permissions. The recommended default share-level permission is Storage File Data SMB Share Contributor for all authenticated identities.
+- To set Windows ACLs, use a user or group with the Storage File Data SMB Share Elevated Contributor role, or mount the share with the storage account key first.
+- Apply the ACLs with `icacls` or File Explorer (File Explorer cannot be used for cloud-only identities), or let FSLogix set them when it creates a folder, with the `SIDDirSDDL` setting.
 
-# Monitor disk performance
-Get-Counter -Counter "\Physical Disk(*)\% Disk Time" -SampleInterval 1 -MaxSamples 60
+Example `icacls` pattern with placeholders:
+
+```text
+icacls \\<server>\<share> /inheritance:r
+icacls \\<server>\<share> /grant:r "CREATOR OWNER":(OI)(CI)(IO)(M)
+icacls \\<server>\<share> /grant:r "<ADMIN-GROUP>":(OI)(CI)(F)
+icacls \\<server>\<share> /grant:r "<USERS-GROUP>":(M)
 ```
 
-**Solutions:**
-1. Enable Cloud Cache for local caching
-2. Reduce profile size (archive old documents)
-3. Optimize storage backend (add IOPS, increase bandwidth)
-4. Check network latency (ExpressRoute for hybrid)
-5. Consider tiering (frequently accessed profiles on faster storage)
+## Authentication to Azure Files
 
-### Issue: Profile Corruption
+The Identity Reference Architecture handout has the detail. In short:
 
-**Symptoms:**
-- User reports missing files or settings
-- FSLogix container mount fails
+- With Microsoft Entra Kerberos, session hosts need no domain controller connectivity.
+- Enable it on the storage account, grant admin consent to the generated application, and exclude that application from MFA Conditional Access policies.
+- Set `CloudKerberosTicketRetrievalEnabled` to `1` on the clients (Intune settings catalog on multi-session, Group Policy or registry), and `LoadCredKeyFromProfile` to `1` under the `AzureADAccount` policy key.
+- Cloud-only identities also need the `kdc_enable_cloud_group_sids` tag in the application manifest.
+- A storage account uses only one identity source.
 
-**Prevention:**
-1. Regular backups of profile storage
-2. Monitor free disk space (don't let storage fill >80%)
-3. Enable crash dumps for FSLogix driver
+Warnings from Microsoft Learn:
 
-**Recovery:**
-```powershell
-# Detach corrupted profile
-Remove-Item -Path "\\<storage-path>\<profile>" -Force
+- A Windows update in April 2026 changes the default Kerberos encryption type from RC4 to AES-SHA1. File shares that host FSLogix containers must be upgraded first.
+- If Microsoft Entra Kerberos was enabled through the old manual preview steps, the storage account service principal password expires every six months, and users then cannot get tickets.
 
-# User gets fresh profile on next login
-# Data in backup or cloud can be recovered
+## High availability with Cloud Cache
+
+Cloud Cache is a design choice; the standard configuration does not need it.
+
+- Use `CCDLocations` instead of `VHDLocations`.
+- For high availability, use at least two storage providers in the same region as the VMs. For disaster recovery, use providers in different regions.
+- Related settings: `ClearCacheOnLogoff` = `1`, and `HealthyProvidersRequiredForRegister` = `1`, which prevents a local cache when a provider is unhealthy.
+
+Example `CCDLocations` string:
+
+```text
+type=smb,name="PRIMARY",connectionString=\\<storage-account-name-1>.file.core.windows.net\<share-name>;type=smb,name="SECONDARY",connectionString=\\<storage-account-name-2>.file.core.windows.net\<share-name>
 ```
 
----
+## One profile across three deployment models
 
-## Portable Profile Strategy (Across All Three Models)
+- Use the same `VHDLocations` pattern, the same container settings and the same user identity in each model. The user then gets the same container.
+- With `ProfileType` set to `0`, one connection uses the container at a time, so this supports sequential use across models.
+- Roaming a profile between models is not replication, and replication is not recovery.
+- Keep the SMB path reachable from every model (network and DNS), and test sign-in on each model.
 
-To enable users to move seamlessly between Azure, Azure Local, and Hybrid deployments:
+## Sizing and growth
 
-### Step 1: Standardized Naming
-```
-Azure:       \\storageaccount.file.core.windows.net\fslogix\<username>
-Azure Local: \\azurelocal-cluster\clusterStorage$\fslogix\<username>
-Hybrid:      \\smb-server.internal\fslogix\<username>
-```
+- The default container size is `30000` MB (`SizeInMBs`). Raising `SizeInMBs` enlarges the container when a larger value is used, and it affects all users with dynamic disks.
+- Deleting content from a container lets it compact at sign-out. Compaction needs FSLogix 2210 (`2.9.8361.52623`) or later.
+- Plan the share size as users times expected container size, plus growth, and keep it inside the limits of your storage. Confirm those limits with the storage provider; do not assume a per-user number.
 
-### Step 2: Identical Container Configuration
-All deployments use same FSLogix settings:
-```
-Same IsDynamic, VolumeType, CloudCache settings
-Different VHDLocations only
-```
+## Troubleshooting
 
-### Step 3: User Mapping
-```
-Host Pool 1 (Azure) → Azure Files Path
-Host Pool 2 (Azure Local) → Cluster CSV Path
-Host Pool 3 (Hybrid) → On-premises NAS Path
+| Symptom | Likely cause | Action |
+|---|---|---|
+| User gets a temporary or local profile | `Enabled` is not `1`, `VHDLocations` is unreachable, or permissions are wrong | Check the registry values, test the UNC path from the host, and check the share-level role and ACLs. |
+| Container full or low disk warning | `SizeInMBs` reached | Raise `SizeInMBs`, then clean up and let the container compact. |
+| Local profile exists and the container is ignored | Local profiles are not removed automatically | Enable `DeleteLocalProfileWhenVHDShouldApply` after users have saved data elsewhere. |
+| Sign-in to the share fails with System error 1327 | The storage application is not excluded from MFA | Exclude the application. |
+| No ticket for the storage account | `CloudKerberosTicketRetrievalEnabled` is missing, or admin consent was not granted | Set the client setting and check consent. |
+| Tickets stop after about six months | Manual preview setup; the service principal password expired | Follow the Microsoft Learn mitigation. |
+| Container locked | The previous session did not detach | The lock retry settings shorten the wait; check for a second session. |
 
-User signs into workspace → AVD routes to appropriate host pool → Profile loads from designated storage
-```
+## Checklist
 
-### Step 4: Profile Sync (Optional)
-For true portability, implement async sync:
-```powershell
-# Scheduled task on each deployment model
-# Copies profiles between storage tiers for replication
-# Enables user mobility without data loss
-```
-
----
-
-## Security Best Practices
-
-### Access Control
-```
-FSLogix share permissions:
-├─ Modify: Authenticated Users (or service account)
-├─ Read: Everyone (limited visibility)
-└─ Full Control: Administrators + SYSTEM account
-```
-
-### Encryption
-
-**Azure Files:**
-- Encryption at rest: Always on (AES-256)
-- Encryption in transit: SMB 3.1.1 + HTTPS
-- No additional configuration needed
-
-**On-Premises NAS:**
-- Enable NAS encryption if available
-- Use IPsec or TLS for transit security
-- Ensure strong access credentials (avoid default passwords)
-
-**Nutanix Files:**
-- Enable Nutanix encryption (encryption at rest + in transit)
-- Configure role-based access
-
-### Monitoring
-```powershell
-# Monitor profile container access
-Enable-PSRemoting -Force
-Invoke-Command -ComputerName <session-hosts> -ScriptBlock {
-    Get-NetTCPConnection -LocalPort 445 -State Established | 
-    Where-Object {$_.RemoteAddress -match "<storage-server>"} |
-    Select-Object LocalAddress, RemoteAddress, State
-}
-```
-
----
-
-## Configuration Checklist
-
-- [ ] FSLogix installed on all session hosts
-- [ ] Storage path validated and accessible
-- [ ] Permissions configured (Modify for users, Full Control for system)
-- [ ] FSLogix Group Policy or registry configured
-- [ ] Profile container location verified (Test with single user)
-- [ ] Cloud Cache enabled (if using remote storage)
-- [ ] Profile size monitored (baseline established)
-- [ ] Backup strategy implemented
-- [ ] Failover tested (storage unavailability)
-- [ ] Performance baselines recorded
-
----
-
-## Next Steps
-
-1. Deploy FSLogix using configuration from your deployment model (Azure, Azure Local, or Hybrid)
-2. Test with pilot users before production
-3. Monitor performance and adjust Cloud Cache settings
-4. Plan for profile migration if moving from local profiles
-5. Implement backup/recovery strategy
-
+- [ ] The share is created in the right region.
+- [ ] The identity source is enabled once.
+- [ ] Share-level permissions are assigned.
+- [ ] ACLs are applied.
+- [ ] Antivirus exclusions are in place.
+- [ ] Registry values are deployed by policy or image.
+- [ ] Kerberos client settings are deployed.
+- [ ] The Cloud Cache decision is recorded.
+- [ ] Sign-in is tested on every deployment model.
+- [ ] A growth and size plan is recorded.

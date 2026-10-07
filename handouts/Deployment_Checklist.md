@@ -1,199 +1,156 @@
-# AVD Anywhere - Deployment Checklist
+# Azure Virtual Desktop: Deployment Checklist
 
-## Pre-Deployment Validation
+Use this checklist to plan, deploy, validate and operate an Azure Virtual Desktop environment across Azure, Azure Local and Azure Virtual Desktop Hybrid.
 
-- [ ] Azure subscription/Azure Local cluster access verified
-- [ ] Required roles assigned (Contributor or higher)
-- [ ] Resource quotas checked (VMs, storage, IP addresses)
-- [ ] Network connectivity validated (no firewall blocks)
-- [ ] Image artifacts prepared (Windows Server, AVD client)
+**Status:** prepared 2026-10-06 against Microsoft Learn; use it with the Identity and FSLogix handouts and re-check the Learn pages for your release.
 
-## Identity Configuration
+## Before you start
 
-- [ ] Entra ID tenant configured (or on-premises AD + Azure AD Connect)
-- [ ] User accounts and groups created
-- [ ] Conditional Access policies designed
-- [ ] MFA configured and tested
-- [ ] Application permissions assigned
-- [ ] Service principals created (if using automation)
+- [ ] An Azure subscription and a Microsoft Entra tenant exist.
+- [ ] The Microsoft.DesktopVirtualization resource provider is registered in the subscription.
+- [ ] Every user has an eligible licence (below).
+- [ ] The person who manages host pools has the Desktop Virtualization Contributor role.
+- [ ] The deployment model is decided per host pool.
 
-## Storage & FSLogix Setup
+Eligible licences:
 
-- [ ] FSLogix storage provisioned (Azure Files / CSV / SMB / NAS)
-- [ ] Storage access validated from session hosts
-- [ ] FSLogix profiles configured
-- [ ] Cloud Cache enabled (if applicable)
-- [ ] Profile size baseline established
-- [ ] Backup strategy implemented
+- **Windows client session hosts:** Microsoft 365 E3, E5, A3, A5, F3, Business Premium or Student Use Benefit; Windows Enterprise E3 or E5; Windows Education A3 or A5; or Windows VDA per user.
+- **Windows Server session hosts:** an RDS CAL with Software Assurance, or RDS User Subscription Licenses.
+- **External users:** per-user access pricing, by enrolling an Azure subscription. It is not available for Windows Server session hosts.
 
-## Azure Deployment Checklist
+A host pool is either all Azure or all Azure Local. Azure Virtual Desktop Hybrid session hosts have their own host pool.
 
-*If deploying AVD on Azure:*
+## Identity
 
-- [ ] Bicep templates validated (syntax, parameters)
-- [ ] Key Vault configured for secrets
-- [ ] Azure Image Builder template prepared
-- [ ] Session host images built and tested
-- [ ] Host pool created in workspace
-- [ ] Session hosts deployed and verified
-- [ ] Azure Files Entra ID Kerberos enabled
-- [ ] FSLogix profiles attached and tested
+The Identity handout has the detail.
 
-## Azure Local Deployment Checklist
+- [ ] Users and groups exist.
+- [ ] The join type is decided per deployment model.
+- [ ] Single sign-on is configured.
+- [ ] Conditional Access covers the Azure Virtual Desktop and Windows Cloud Login applications.
+- [ ] The Virtual Machine User Login role is assigned on Microsoft Entra-joined hosts.
+- [ ] Per-user MFA is off.
 
-*If deploying AVD on Azure Local:*
+## Network
 
-- [ ] Cluster validated and Arc-connected
-- [ ] Local Identity initialized (or AD domain configured)
-- [ ] Network ATC intent designed and applied
-- [ ] Cluster CSV prepared for FSLogix
-- [ ] Session host image created (via Image Builder or local tooling)
-- [ ] VMs deployed on cluster
-- [ ] FSLogix profile paths verified
-- [ ] Arc agents reporting to Azure
+- [ ] A virtual network and subnet exist in the same Azure region as the session hosts (Azure deployments).
+- [ ] Session hosts can reach the required URLs outbound over TCP 443: `login.microsoftonline.com`, `*.wvd.microsoft.com`, the monitoring and agent endpoints, and, for Windows activation, `azkms.core.windows.net` on port 1688.
+- [ ] The Azure platform addresses `169.254.169.254` and `168.63.129.16` are not intercepted or proxied.
+- [ ] Domain controllers and DNS are reachable if hosts join AD DS or Microsoft Entra Domain Services.
+- [ ] Round-trip latency from the client network to the Azure region of the host pool is below 150 ms.
+- [ ] Microsoft 365 endpoints are allowed if users run Microsoft 365 apps.
 
-## Hybrid Deployment Checklist
+No inbound ports are needed for users or hosts to connect to the service. RDP Shortpath (UDP) is optional: for managed networks, enable the listener (default port 3390) and allow that inbound port on the session hosts; for public networks, STUN and TURN work without extra configuration when firewalls allow them.
 
-*If deploying AVD on Windows Server / vSphere / Nutanix:*
+## Host pool, workspace and application group
 
-- [ ] On-premises infrastructure assessed (hypervisor, network, storage)
-- [ ] Session host VMs created
-- [ ] Session hosts domain-joined to on-premises AD
-- [ ] Entra ID Connect running and syncing users
-- [ ] AVD agent installed on session hosts
-- [ ] Arc agents installed and connected to Azure
-- [ ] On-premises storage configured for FSLogix
-- [ ] Network connectivity to Azure verified (ExpressRoute recommended)
-- [ ] Firewall rules allow Entra ID endpoints
+- [ ] The host pool is created (pooled or personal, with a load balancing option; a validation environment is optional).
+- [ ] The desktop application group is created and registered to a workspace.
+- [ ] Users or groups are assigned to the application group.
+- [ ] A registration key is generated only for as long as needed.
 
-## AVD Workspace & Host Pool Setup
+Notes:
 
-- [ ] AVD workspace created in Azure
-- [ ] Host pool created (Pooled, Personal, or Validation)
-- [ ] Host pool settings configured:
-  - [ ] Max session limit
-  - [ ] Load balancing algorithm
-  - [ ] Start VM on disconnect
-  - [ ] User assignment policy
-- [ ] Application groups created (Desktop, Remote App)
-- [ ] Users assigned to host pool
-- [ ] Validation host pool tested first
+- A workspace can expose desktops from several host pools, including host pools of different deployment models.
+- A registration key authorises session hosts to join a host pool. Its expiry is between one hour and 27 days.
+- Event 3277 with `INVALID_REGISTRATION_TOKEN` or `EXPIRED_MACHINE_TOKEN` means the key is not valid. Create a new key, set `IsRegistered` to `0` and the new `RegistrationToken` under `HKLM:\SOFTWARE\Microsoft\RDInfraAgent`, then restart the `RDAgentBootLoader` service.
+- The session host configuration feature is not supported on Azure Local or Hybrid.
 
-## Monitoring & Logging Configuration
+## Session hosts on Azure
 
-- [ ] Azure Monitor agent installed on session hosts
-- [ ] Data Collection Rule configured
-- [ ] Log Analytics workspace created
-- [ ] AVD-specific queries setup
-- [ ] Alerts configured for:
-  - [ ] High CPU/memory utilization
-  - [ ] Storage connectivity issues
-  - [ ] Session host failures
-- [ ] Insights dashboard configured
+- [ ] Hosts deploy from a pinned image (Azure Marketplace or an Azure Compute Gallery image).
+- [ ] The OS disk is Premium SSD for production.
+- [ ] The Windows licence is applied: automatically when you deploy through Azure Virtual Desktop, otherwise set the `Windows_Client` (or server) licence type yourself.
+- [ ] Windows Server hosts can reach an RDS licence server.
 
-## Security Hardening
+Trusted launch is the default security type in the portal flow.
 
-- [ ] Session host image hardened (Windows Defender, Windows Firewall)
-- [ ] RDP access restricted (NLA enabled)
-- [ ] UAC configured appropriately
-- [ ] Antivirus/EDR deployed
-- [ ] Network Security Groups configured
-- [ ] Private endpoints used (if applicable)
-- [ ] Encryption enabled (storage, transport)
+## Session hosts on Azure Local
 
-## User Testing
+- [ ] The instance runs Azure Local 23H2 or later and is registered with Azure.
+- [ ] The image is supported: Windows 11 Enterprise (multi-session or single-session), Windows 10 Enterprise (both), or Windows Server 2025, 2022 or 2019.
+- [ ] The Azure Connected Machine (Arc) agent is on the VMs; the portal flow installs it.
+- [ ] The VMs are licensed and activated: Azure verification for VMs covers Windows 10 and 11 Enterprise multi-session and Windows Server 2022 Datacenter: Azure Edition; other editions use your existing activation method.
+- [ ] The join method is chosen: the portal adds hosts only to an AD DS domain (including hybrid join); Microsoft Entra join is done with PowerShell or other deployment methods.
+- [ ] Sizing is checked against your hardware, then monitored: performance and density vary by hardware.
 
-- [ ] Test user account created
-- [ ] User can sign in to AVD workspace
-- [ ] Session launches and connects successfully
-- [ ] Profile loads correctly
-- [ ] Network drives/printers mapped
-- [ ] Applications launch
-- [ ] Performance acceptable (login time < 30 sec)
-- [ ] Multiple concurrent users tested
+The Azure Virtual Desktop service in Azure is required for brokering, and each host pool holds only Azure Local hosts. Azure Virtual Desktop Insights and Azure policy reach these hosts through Arc.
 
-## Failover & Disaster Recovery
+## Session hosts on Azure Virtual Desktop Hybrid
 
-- [ ] Backup strategy documented
-- [ ] Storage backup tested
-- [ ] Session host image backup validated
-- [ ] Failover procedures documented
-- [ ] ASR (Site Recovery) configured (if applicable)
-- [ ] RTO/RPO targets established
-- [ ] Failover drill completed
+- [ ] Each machine is Arc-enabled with the Azure Connected Machine agent, and the Arc endpoints are allowed.
+- [ ] A host pool registration key is generated.
+- [ ] The Azure Virtual Desktop Arc extension (`CloudDeviceExtension`, publisher `Microsoft.AzureVirtualDesktop`) is installed with the registration token.
+- [ ] You can deploy and power-manage the VMs with your hypervisor tools.
 
-## Go-Live Preparation
+Facts to plan around:
 
-- [ ] Runbook documented
-- [ ] Support team trained
-- [ ] Communication sent to users
-- [ ] Phased rollout planned
-- [ ] Rollback plan prepared
-- [ ] Monitoring dashboards ready
-- [ ] Support contact information distributed
+- Supported operating systems: Windows 11 or 10 Enterprise single-session, and Windows Server 2025, 2022, 2019 or 2016. Multi-session editions are not supported.
+- Windows client hosts can be Microsoft Entra joined, AD DS joined or hybrid joined; Windows Server hosts must be AD DS joined or hybrid joined.
+- Licensing is the user entitlement (as for Azure; for Windows Server an RDS CAL with Software Assurance or RDS User Subscription Licenses) plus the Azure Virtual Desktop Hybrid service user license.
+- Hybrid does not provide power management, autoscale, Start VM on Connect or session host configuration.
 
-## Post-Deployment Validation (Day 1)
+## Profiles with FSLogix
 
-- [ ] All users connected successfully
-- [ ] No critical errors in logs
-- [ ] Performance metrics within baseline
-- [ ] Storage performing normally
-- [ ] Monitor load (concurrent connections, CPU, memory)
-- [ ] Respond to user issues
+- [ ] The share and identity source are planned using the FSLogix handout.
+- [ ] The standard registry values are deployed.
+- [ ] Antivirus exclusions are configured.
+- [ ] ACLs are applied.
+- [ ] Sign-in is tested on each deployment model.
 
-## Day-2 Operations
+## Monitoring and scaling
 
-- [ ] Monitoring alerts validated
-- [ ] Performance baselines established
-- [ ] Capacity planning begun
-- [ ] Patching schedule defined
-- [ ] Backup restoration tested
-- [ ] Access review completed
+- [ ] Host pool diagnostics go to a Log Analytics workspace, and Azure Virtual Desktop Insights is enabled.
+- [ ] A scaling approach is chosen for each host pool (below).
 
----
+Scaling facts:
 
-## Deployment Validation Script
+- Autoscale scaling plans work for pooled and personal host pools on Azure. Power management autoscale is generally available; dynamic autoscale is in preview and needs a session host configuration.
+- Autoscale needs the Desktop Virtualization Power On Off Contributor role for the Azure Virtual Desktop service principal, at host pool, resource group or subscription scope.
+- Do not use autoscale and the Azure Automation scaling tool on the same host pool.
+- Session host configuration is not supported on Azure Local, so dynamic autoscale is not available there, and the Learn autoscale articles do not list Azure Local for power management; confirm before you rely on it.
+- Start VM on Connect is an Azure option.
 
-Use this PowerShell snippet to validate post-deployment:
+## Security
 
-```powershell
-# Validate session host connectivity
-$sessionHosts = Get-AzVMHostGroup -ResourceGroupName <rg> | ForEach-Object { $_.Name }
-foreach ($host in $sessionHosts) {
-    if (Test-Connection -ComputerName $host -Count 1 -Quiet) {
-        Write-Host "✓ $host - Reachable"
-    } else {
-        Write-Host "✗ $host - Not reachable"
-    }
-}
+- [ ] Conditional Access with MFA is applied through the two applications.
+- [ ] Trusted launch and Secure Boot are on for Azure hosts.
+- [ ] RBAC follows least privilege.
+- [ ] Windows, FSLogix and the Arc agent are kept patched.
+- [ ] Azure Local machines meet the TPM 2.0 and Secure Boot requirements.
 
-# Validate FSLogix profile storage
-$profilePath = "\\<storage>\fslogix"
-if (Test-Path -Path $profilePath) {
-    Write-Host "✓ FSLogix storage accessible"
-    Get-ChildItem -Path $profilePath | Measure-Object | Select-Object Count
-} else {
-    Write-Host "✗ FSLogix storage not accessible"
-}
+## Test before go-live
 
-# Validate Entra ID connectivity
-Connect-MgGraph -Scopes "User.Read.All" -NoWelcome
-if ($?) {
-    Write-Host "✓ Entra ID connectivity verified"
-} else {
-    Write-Host "✗ Entra ID connectivity failed"
-}
-```
+- [ ] Sign in from Windows App once and confirm a single prompt.
+- [ ] Both Microsoft Entra sign-in log entries (Azure Virtual Desktop and Windows Cloud Login) show Success.
+- [ ] A cifs Kerberos ticket exists in the session.
+- [ ] The profile container is created on the share and detaches at sign-out.
+- [ ] The registration key is replaced or expired after use.
+- [ ] A failure drill passes: stop one host and confirm a new session lands on another host.
 
----
+## Day 1 and Day 2
 
-## Common Issues & Quick Fixes
+Day 1:
 
-| Issue | Cause | Fix |
-|-------|-------|-----|
-| Users can't sign in | Entra ID / network issue | Verify Entra ID, check firewall, test DNS |
-| FSLogix profile not loading | Storage unreachable or permissions | Verify path, check NTFS permissions, test connectivity |
-| Session host not healthy | Image issue or resource constraint | Check event logs, verify CPU/memory/disk, reimage if needed |
-| Slow login time | Storage latency or large profile | Enable Cloud Cache, optimize profile, check network |
-| Users lose settings | Profile sync issue | Verify FSLogix is enabled, check storage space |
+- [ ] Users reach desktops from each deployment model.
+- [ ] Profile portability is validated.
+- [ ] Monitoring data is arriving.
 
+Day 2:
+
+- [ ] The image replacement process is reviewed.
+- [ ] Patching is reviewed.
+- [ ] Autoscale and capacity are reviewed.
+- [ ] Registration keys are rotated.
+- [ ] Conditional Access sign-in logs are reviewed.
+
+## Quick fixes
+
+| Symptom | Fix |
+|---|---|
+| "Your account is configured to prevent you from using this device" | Assign the Virtual Machine User Login role. |
+| Error 1327 on the file share | Exclude the storage account application from MFA. |
+| Repeated sign-in prompts | Align the two Conditional Access applications and disable per-user MFA. |
+| Host not available after resume from hibernate | Known limitation: prefer deallocate. |
+| `INVALID_REGISTRATION_TOKEN` | Create a new registration key and re-register the host. |
+| Windows App cannot sign in | A Conditional Access policy blocks the Windows 365 application. |

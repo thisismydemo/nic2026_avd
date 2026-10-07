@@ -1,265 +1,144 @@
-# Q&A Resources - AVD Anywhere
+# Azure Virtual Desktop: Questions and Resources
 
-## General AVD Questions
+This handout answers the questions attendees ask most often and lists where to read more.
 
-**Q: What's the difference between Azure Virtual Desktop and Remote Desktop Services?**
+**Status:** prepared 2026-10-06 against Microsoft Learn; prices and support change, so follow the pricing and documentation links.
 
-A: Azure Virtual Desktop (AVD) is the cloud-based replacement for RDS. It's managed by Microsoft, automatically updated, and integrates natively with Entra ID and Azure services. RDS requires you to manage the infrastructure yourself.
+## Choosing a deployment model
 
-**Q: Can I use AVD without Azure?**
+**Which components always live in Azure?** The Azure Virtual Desktop service components: host pools, workspaces and application groups.
 
-A: Only with AVD Hybrid on-premises. But Hybrid still requires Azure for the control plane (AVD service). You can't run AVD entirely on-premises.
+**Where can session hosts run?** On Azure, on Azure Local (your cluster), or on your own hypervisor with Azure Virtual Desktop Hybrid.
 
-**Q: What's the difference between Pooled and Personal host pools?**
+**Can one workspace include more than one deployment model?** Yes. One workspace can show desktops from host pools of several models. A host pool is either all Azure or all Azure Local.
 
-A: **Pooled** = Multiple users per VM (cost-efficient, stateless). **Personal** = One user per VM (desktop persistence, more stateful).
+**How should I choose?**
 
----
+- Azure for elasticity and the least infrastructure.
+- Azure Local when data or latency keeps compute on site and you have Azure Local.
+- Hybrid to reuse an existing hypervisor without new hardware.
 
-## Deployment Model Comparison
+**What should I confirm for the host operating system?**
 
-**Q: Should I use Azure, Azure Local, or Hybrid?**
+- Azure Local needs version 23H2 or later registered with Azure, and supports Windows 11 Enterprise (multi-session and single-session), Windows 10 Enterprise, and Windows Server 2025, 2022 and 2019.
+- Hybrid supports Windows 11 or 10 Enterprise single-session and Windows Server, but not multi-session. It has no power management, autoscale, Start VM on Connect or session host configuration.
+- The Realm Comparison handout covers all thirteen axes.
 
-A: 
-- **Azure** = Scalability, elasticity, global reach needed
-- **Azure Local** = Data sovereignty, latency-sensitive workloads, on-premises data
-- **Hybrid** = Existing on-premises infrastructure, no budget for new hardware
+## Identity and sign-in
 
-**Q: Can I mix all three in one workspace?**
+**Can users be cloud-only or hybrid?** Yes. Hybrid users are synced with Microsoft Entra Connect Sync or Microsoft Entra Cloud Sync.
 
-A: Yes! One workspace, multiple host pools in different deployment models. Users see one sign-in; AVD routes to appropriate pool.
+**Do session hosts need AD DS?** Not Microsoft Entra-joined Windows client hosts. Windows Server hosts need AD DS or hybrid join.
 
-**Q: How do I move users between deployment models?**
+**What enables single sign-on?** It uses the Azure Virtual Desktop and Windows Cloud Login applications; keep their Conditional Access policies aligned.
 
-A: If FSLogix is configured identically, users maintain profile continuity. Different storage paths, same profile structure.
+**Which role do users need on Microsoft Entra-joined hosts?** The Virtual Machine User Login role. Use Conditional Access for MFA, not per-user MFA.
 
----
+The Identity Reference Architecture handout has the detail.
 
-## Identity & Authentication
+## Profiles
 
-**Q: Do I need on-premises Active Directory?**
+**How does FSLogix store profiles?** In VHDX containers on an SMB share, attached at sign-in.
 
-A:
-- **Azure**: No (Entra ID-only is recommended)
-- **Azure Local**: No (use Local Identity), but AD is supported
-- **Hybrid**: Yes, recommended (can use cloud-only with Arc)
+**What is the cloud-first storage option?** Azure Files with Microsoft Entra Kerberos. Session hosts need no domain controller connectivity, and a storage account uses one identity source.
 
-**Q: What's the difference between Entra ID-only and Hybrid identity?**
+**What storage works with Azure Local hosts?** A file server VM, Scale-Out File Server on the cluster, or Azure Files. FSLogix needs an SMB service, not a cluster shared volume path.
 
-A:
-- **Entra ID-only** = Users in cloud only, simpler
-- **Hybrid** = Users synced from on-premises AD to Entra ID via Azure AD Connect, supports conditional on-premises + cloud access
+**Roaming, redundancy and recovery?** Cloud Cache gives redundancy across storage providers. Roaming a profile is not replication, and replication is not recovery.
 
-**Q: Can users with Entra ID-only accounts access on-premises resources?**
+The FSLogix Configuration Guide has the settings.
 
-A: Only if those resources are cloud-enabled or support modern auth (Kerberos delegation). Entra ID-only breaks traditional Kerberos delegation.
+## Images
 
----
+**How do I build and publish images for Azure hosts?** Build with Azure Image Builder or your own pipeline, publish to an Azure Compute Gallery, and deploy hosts from an image version.
 
-## FSLogix & Storage
+**How are Azure Local images supplied?** As an Azure Local VM image, for example from Azure Marketplace images, a gallery or a VHD import.
 
-**Q: What's the maximum profile size?**
+**How are Hybrid images built?** Typically with Packer and the platform builder for your hypervisor.
 
-A: No hard limit, but typical is 5-30 GB. Larger profiles = slower login. Consider archiving or excluding certain folders.
-
-**Q: Do I need high-performance storage?**
-
-A: Depends on scale:
-- **Small** (< 100 users): Standard NAS or SMB is fine
-- **Medium** (100-500 users): Premium tier or NAS with good throughput
-- **Large** (> 500 users): Azure Files Premium, high-IOPS NAS, or local cluster CSV
-
-**Q: What's Cloud Cache, and do I need it?**
-
-A: Cloud Cache caches FSLogix containers locally on the session host for faster access. Recommended for remote deployments or slow storage.
-
-**Q: Can I replicate profiles between Azure and on-premises?**
-
-A: Not automatically. You'd need a sync service (e.g., Azure File Sync, custom replication). For true mobility, store profiles centrally (Azure Files or NAS both can access).
-
----
-
-## Image Management
-
-**Q: What's the difference between Image Builder and Packer?**
-
-A:
-- **Image Builder** = Azure-native, simpler, but only for Azure/Azure Local
-- **Packer** = Generic tool, works anywhere (Hyper-V, vSphere, Nutanix)
-
-**Q: How often should I update images?**
-
-A: Monthly (with Windows Update) at minimum. Weekly if rapid patching is needed. Test updates in validation host pool first.
-
-**Q: Can I use the same image for Azure, Azure Local, and Hybrid?**
-
-A: No. Images are platform-specific (Hyper-V VHD, vSphere VMDK, Nutanix QCOW2). Use Image Builder for Azure/Azure Local, Packer for Hybrid.
-
----
+**Any practices to keep?** Share customisation scripts between realms and do not bake identity into an image. For pooled pools, this session's practice is to replace hosts from a new image version instead of patching in place; that is the session's practice, not a Microsoft requirement.
 
 ## Networking
 
-**Q: Do I need ExpressRoute for Hybrid deployments?**
+**Do I open inbound ports?** No. Clients and hosts make outbound TCP 443 connections to the service, and the required URL list must be allowed.
 
-A: Not required, but recommended. ExpressRoute provides:
-- Better security (private connection)
-- More consistent latency
-- Higher reliability
-- Better for hybrid identity and monitoring
+**Which Azure platform addresses must not be intercepted?** `169.254.169.254` and `168.63.129.16`.
 
-Public internet works, but performance/security is lower.
+**What does RDP Shortpath do?** It adds a UDP transport for better reliability and latency, on managed networks and on public networks (STUN or TURN).
 
-**Q: What network bandwidth do I need?**
+**What latency and region rules apply?** Client-to-region round-trip latency should be below 150 ms, and session hosts on Azure must be in a virtual network in the same region.
 
-A: Depends on workload:
-- **Office apps** = 1-2 Mbps per user
-- **Video streaming** = 10-25 Mbps per user
-- **GPU workloads** = 50+ Mbps
+## Scaling and cost
 
-Multiply by concurrent user count + overhead.
+**What costs apply to each model?**
 
----
+- Azure: Azure compute and storage, plus the user licence.
+- Azure Local: the Azure Local service fee, the Azure Virtual Desktop for Azure Local service fee (charged per active vCPU of session hosts), and the user licence.
+- Hybrid: your infrastructure, the user licence, and the Azure Virtual Desktop Hybrid service user license.
 
-## Performance & Scaling
+For amounts, use the Azure Virtual Desktop and Azure Local pricing pages.
 
-**Q: Why are my users experiencing slow logins?**
+**Which user licences are eligible?**
 
-A: Common causes (in order of likelihood):
-1. Large FSLogix profile (check profile size)
-2. Storage latency (check network, Cloud Cache)
-3. Image too large or fragmented (rebuild image)
-4. Session host resource contention (CPU/RAM/disk)
-5. Network bandwidth insufficient
+- Windows client session hosts: Microsoft 365 E3, E5, A3, A5, F3, Business Premium or Student Use Benefit; Windows Enterprise E3 or E5; Windows Education A3 or A5; Windows VDA per user.
+- Windows Server session hosts: an RDS CAL with Software Assurance, or RDS User Subscription Licenses.
+- External commercial users: per-user access pricing (Windows client only).
+- Azure Dev/Test pricing lets users connect to a deployment in a Dev/Test subscription for acceptance tests without separate licence entitlement.
 
-**Q: How many users per session host?**
+**What autoscale options exist?** Scaling plans work for pooled and personal host pools on Azure. Power management autoscale is generally available; dynamic autoscale is in preview and needs a session host configuration. Session host configuration is not supported on Azure Local, and Hybrid has none of these features.
 
-A: Rule of thumb:
-- **Light workload** = 4-6 users per 4-vCPU VM
-- **Medium workload** = 2-4 users
-- **Heavy workload** = 1-2 users
-
-Test with your workload; results vary.
-
-**Q: Should I use auto-scaling?**
-
-A: Yes, if load varies (office hours vs. nights). Azure Autoscale pools VMs up/down based on demand. For consistent load, static sizing is fine.
-
----
+**What else keeps cost down?** Right-size VMs from measured usage and use multi-session. Do not use autoscale and the Azure Automation scaling tool on the same host pool.
 
 ## Security
 
-**Q: Is AVD secure?**
+**What is the default VM security type in the Azure host pool flow?** Trusted launch.
 
-A: Yes. Entra ID, conditional access, and network isolation provide strong security. But like any RDP/remote access, follow best practices:
-- Multi-factor authentication (required)
-- Conditional access policies
-- Network segmentation
-- Endpoint protection
-- Regular patching
+**How do I apply MFA and access control?** Use Conditional Access with MFA through the Azure Virtual Desktop and Windows Cloud Login applications, and least-privilege roles: Desktop Virtualization Contributor for host pool management and Desktop Virtualization User for application group users.
 
-**Q: Can users access local devices (printer, USB, etc.)?**
+**What about Azure Local machines?** They require TPM 2.0 and Secure Boot. Keep agents and Windows updated.
 
-A: Yes, via device redirection. Can be restricted by policy. Be careful with USB (security risk in multi-user environments).
+## Monitoring and support
 
-**Q: How do I prevent data exfiltration?**
+**Where do diagnostics go?** To a Log Analytics workspace, with Azure Virtual Desktop Insights on top.
 
-A: Use Conditional Access policies, DLP (Data Loss Prevention) in Microsoft 365, and monitor file access. Restrict copy/paste, file download.
+**How do Azure Local and Hybrid hosts report?** Through the Azure Arc agent, into the same workspace.
 
----
+**Which patching tool applies?** Azure Update Manager covers Windows Server, not Windows 10 or 11 guests; use Intune or Windows Update for Business for those.
 
-## Monitoring & Support
+**What do I collect before a support request?** The agent events from the session host (RDAgent), along with the host pool name and region.
 
-**Q: How do I monitor AVD performance?**
+## Quick troubleshooting
 
-A: Use Azure Monitor + Log Analytics. Collect:
-- Session host CPU/memory/disk
-- Connection latency
-- Session login time
-- User activity
-- Errors/disconnects
+| Symptom | What to check |
+|---|---|
+| Host shows Unavailable after a registration problem | Event 3277, then generate a new registration key (valid from 1 hour to 27 days). |
+| Sign-in works but the desktop will not open | The Virtual Machine User Login role, and the Windows Cloud Login application in Conditional Access. |
+| Repeated sign-in prompts | Align the two Conditional Access policies and disable per-user MFA. |
+| Profile will not attach | The share path, permissions, the Kerberos ticket, and whether the storage application is excluded from MFA. |
+| Windows App sign-in error with Conditional Access | Whether a policy blocks the Windows 365 application. |
+| Hosts not scaling | The role on the Azure Virtual Desktop service principal, and that the host pool is not using two scaling tools. |
 
-**Q: What should I alert on?**
+## Resources
 
-A:
-- Host health (unhealthy, no heartbeat)
-- Performance (CPU > 80%, memory > 90%)
-- Connections (too many failures)
-- Storage (latency spikes, disk full)
-- Users (unusual access patterns)
+Microsoft Learn topics:
 
-**Q: How do I troubleshoot session host issues?**
+- Prerequisites for Azure Virtual Desktop
+- Licensing Azure Virtual Desktop
+- Azure Virtual Desktop on Azure Local
+- Azure Virtual Desktop Hybrid overview
+- Required FQDNs and endpoints for Azure Virtual Desktop
+- Configure single sign-on for Azure Virtual Desktop using Microsoft Entra ID
+- Enforce Microsoft Entra multifactor authentication for Azure Virtual Desktop using Conditional Access
+- FSLogix: configure profile containers
+- FSLogix: store profile containers on Azure Files using Microsoft Entra ID
+- Autoscale scaling plans for Azure Virtual Desktop
+- Azure Virtual Desktop Insights
+- RDP Shortpath for Azure Virtual Desktop
+- Azure Virtual Desktop pricing
 
-A:
-1. Check Event Viewer (System, Application, FSLogix logs)
-2. Check Azure Monitor
-3. Review RDP logs (Event ID 1101+)
-4. Test connectivity to dependencies (storage, Entra ID, monitoring)
-5. Check resource utilization (Task Manager, Performance Monitor)
+In this repository:
 
----
-
-## Costs
-
-**Q: How much does AVD cost?**
-
-A: Two components:
-1. **Azure compute** = Session host VMs ($$ per hour)
-2. **AVD licenses** = Per-user access rights (included in Microsoft 365 or $10/month standalone)
-
-**Q: How can I optimize costs?**
-
-A:
-- Use Spot VMs (cheaper, preemptable)
-- Right-size VMs (don't over-provision)
-- Auto-scale (don't run empty VMs)
-- Reserved Instances (if predictable load)
-- Use pooled (not personal) host pools
-
-**Q: What about storage costs?**
-
-A: FSLogix profiles consume storage. Plan for:
-- Profile storage (e.g., Azure Files @ $0.08/GB/month LRS)
-- Backup storage
-- Tiering (archive old profiles)
-
----
-
-## Troubleshooting Guide - Quick Reference
-
-| Symptom | Likely Cause | Quick Fix |
-|---------|-------------|-----------|
-| Can't sign in | Entra ID issue | Verify sign-in to Entra ID portal |
-| Slow login | FSLogix storage latency | Enable Cloud Cache; check network |
-| No network drive | Group Policy not applied | Reapply GPO or restart session host |
-| Application won't launch | Missing app or permissions | Check app installation, user permissions |
-| Choppy video/audio | Network bandwidth low | Check network, reduce video quality, close other apps |
-| Can't access shared printer | Printer redirection disabled | Enable in host pool config |
-
----
-
-## Resources & Links
-
-**Microsoft Documentation:**
-- AVD Learning Path: aka.ms/AVDLearn
-- FSLogix: aka.ms/FSLogix
-- Azure Local: aka.ms/AzureLocal
-- Network ATC: aka.ms/NetworkATC
-
-**Community:**
-- AVD Tech Community: https://aka.ms/AVDTechCommunity
-- Microsoft Q&A: https://learn.microsoft.com/answers/tags/345/azure-virtual-desktop
-
-**Tools:**
-- AVD Insights: Built into Azure Portal
-- LAD (Lightweight Azure Diagnostics): GitHub
-- FSLogix Troubleshooting: aka.ms/FSLogixTroubleshooting
-
----
-
-## Still Have Questions?
-
-- Check the **Identity_Reference_Architecture.md** for deep-dives on identity models
-- Review **FSLogix_Configuration_Guide.md** for storage setup
-- Use **Deployment_Checklist.md** to validate your setup
-- Check Microsoft Learn for official documentation
-
+- [Realm comparison](Realm_Comparison.md)
+- [Identity reference architecture](Identity_Reference_Architecture.md)
+- [FSLogix configuration guide](FSLogix_Configuration_Guide.md)
+- [Deployment checklist](Deployment_Checklist.md)
