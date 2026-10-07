@@ -1,0 +1,153 @@
+# lz-avd — AVD landing zone manifest (automation/CONTRACT.md §2, §10)
+# Implements design/avd/landing-zone.md (AVD-LZ-01..14). Values live in environment/shared/*.yml and environment/avd/*.yml
+# (schemas: automation/shared/schemas/*.environment.schema.json), never here. `path` points at the config key when the
+# canonical design name differs from the schema key.
+name: lz-avd
+description: AVD application landing zone — resource groups, spoke network, private DNS, FSLogix storage, gallery, identities, monitoring, governance and RBAC that the three AVD realms consume.
+scope: avd
+tools: [bicep, terraform]
+depends_on: [lz-azure-local]
+
+inputs:
+  # --- naming and placement (design §11.5; shared environment file) ---
+  - { name: org,                      type: string, description: "Organization token in every name (D-006).", required: true, source: environment }
+  - { name: lab_token,                type: string, description: "Lab/conference token in every name (D-005); shared schema key `token`.", required: true, source: environment, path: token }
+  - { name: location,                 type: string, description: "Azure region for every regional resource (D-010).", required: true, source: environment }
+  - { name: location_short,           type: string, description: "Short region token used in names.", required: true, source: environment }
+  - { name: tenant_id,                type: string, description: "Entra tenant id (D-002).", required: true, source: environment }
+  - { name: subscription_id_avd,      type: string, description: "AVD landing-zone subscription id (D-004).", required: true, source: environment }
+  - { name: subscription_id_azl,      type: string, description: "Azure Local landing-zone subscription id (D-004); far side of the spoke-to-spoke peering.", required: true, source: environment }
+  - { name: management_group_id,      type: string, description: "Parent management group (D-004); informational, policy is assigned at subscription scope (P-06).", required: true, source: environment }
+  - { name: tags,                     type: map,    description: "The seven required tags (naming standard §3a); workload=avd and managed-by are added per track.", required: true, source: environment }
+  - { name: owner_email,              type: string, description: "Owner e-mail for budget notifications (shared schema key).", required: true, source: environment }
+  - { name: names,                    type: map,    description: "Name catalog resolved by ConvertTo-NIC26BicepParam / ConvertTo-NIC26TfVars from the names section below (contract §10).", required: true, source: generated }
+
+  # --- shared platform resources (explicit inputs, never created or renamed; contract §4) ---
+  - { name: hub_vnet_id,              type: string, description: "Existing hub VNet resource id (connectivity subscription). The hub-side peering is the only change made to it.", required: true, source: environment }
+  - { name: hub_address_space,        type: string, description: "Hub address space (reference for NSG sanity checks).", required: true, source: environment }
+  - { name: identity_spoke_vnet_id,   type: string, description: "Existing identity spoke VNet id; receives a link to the lab's privatelink.file zone (P-11).", required: true, source: environment }
+  - { name: p2s_pool,                 type: string, description: "Point-to-site client pool (presenter path, D-018) for the Shortpath NSG rule; shared schema key `p2s_client_pool`.", required: true, source: environment, path: p2s_client_pool }
+  - { name: bastion_subnet_prefix,    type: string, description: "Existing AzureBastionSubnet prefix; admin RDP source for the hosts NSG (design §4.6). The lab jump server is covered by azl_spoke_prefix.", required: true, source: environment }
+  - { name: onprem_compute_prefixes,  type: list,   description: "On-prem session-host ranges (AVD-hosts VLAN per P-08 plus the Azure Local AVD lnet range) allowed to the private endpoint.", required: true, source: environment }
+
+  # --- Azure Local landing-zone outputs consumed here ---
+  - { name: azl_spoke_vnet_id,        type: string, description: "Azure Local spoke VNet id (lz-azure-local output) for the direct spoke-to-spoke peering and the zone link.", required: true, source: environment }
+  - { name: azl_spoke_prefix,         type: string, description: "Azure Local spoke prefix (NSG rules; also the admin source for the jump server).", required: true, source: environment }
+  - { name: log_analytics_workspace_id, type: string, description: "Lab workspace law-* (lz-azure-local output); destination for the AVD DCR, diagnostics and alerts (AVD-LZ-12).", required: true, source: environment }
+  - { name: key_vault_id,             type: string, description: "Operations vault id (lz-azure-local output). Consumed by scripts only; IaC never reads secrets (AVD-LZ-13).", required: true, source: environment }
+  - { name: action_group_id,          type: string, description: "Ops action group id (lz-azure-local output) for budget and alert notifications.", required: true, source: environment }
+
+  # --- network (design §4) ---
+  - { name: avd_vnet_prefix,          type: string, description: "AVD spoke address space (AVD-LZ-04).", required: true, source: environment }
+  - { name: avd_subnets,              type: map,    description: "Subnet prefixes keyed hosts, pe, imgbuild, dnsin (design §4.1).", required: true, source: environment }
+  - { name: enable_private_endpoints, type: bool, description: "Owner decision D-029: false (default) = Azure Files on its public endpoint; no privatelink zone, links or resolver. true restores the private-endpoint design.", required: false, default: false, source: environment }
+  - { name: enable_dns_private_resolver, type: bool, description: "Deploy the DNS Private Resolver inbound endpoint (AVD-LZ-06 / P-07 option B). Set false for the DC conditional-forwarder option. ADDED flag; not yet in avd.environment.schema.json.", required: false, default: true, source: environment }
+  - { name: dns_resolver_inbound_ip,  type: string, description: "Static IP of the resolver inbound endpoint inside the dnsin subnet; handed back to the Azure Local design for lnet DNS.", required: true, source: environment }
+  - { name: privatelink_file_zone_id, type: string, description: "Existing privatelink.file.core.windows.net zone id to reuse; empty creates the lab's own zone (P-11).", required: false, default: "", source: environment }
+  - { name: link_privatelink_zone_to_hub, type: bool, description: "Also link the zone to the hub VNet (design §4.5 lists the hub; P-11 lists the identity VNet). ADDED flag; not yet in the schema.", required: false, default: false, source: environment }
+
+  # --- storage and backup (design §7) ---
+  - { name: share_names,              type: map,    description: "FSLogix share names keyed profiles and odfc (naming standard §5).", required: true, source: environment }
+  - { name: share_quota_gib,          type: int,    description: "Provisioned size per share in GiB.", required: false, default: 256, source: environment }
+  - { name: enable_backup,            type: bool,   description: "Deploy the Recovery Services vault and protect both shares (design §7.9). ADDED flag; not yet in the schema.", required: false, default: true, source: environment }
+  - { name: backup_policy,            type: map,    description: "Azure Files backup policy: schedule_time_utc (HH:mm), retention_days (schema shape).", required: true, source: environment }
+
+  # --- images (design §8) ---
+  - { name: image_definitions,        type: list,   description: "Gallery image definitions (name, publisher, offer, sku, os_type, hyper_v_generation, security_type, os_state); schema path images.image_definitions.", required: true, source: environment, path: images.image_definitions }
+
+  # --- governance (design §2) ---
+  - { name: avd_budget_monthly,       type: int,    description: "Monthly budget amount (design §2.3).", required: true, source: environment }
+  - { name: enable_policy_assignments, type: bool,  description: "Assign the built-in Deny/Audit/Modify policies of design §2.4 at subscription scope. ADDED flag; not yet in the schema (DINE policies are a documented gap).", required: false, default: true, source: environment }
+
+  # --- identity principals (design §5; object ids written by the Graph scripts) ---
+  - { name: group_object_ids,         type: map,    description: "Object ids of the AVD groups (schema keys avd_azure, avd_azl, avd_hybrid, avd_users, avd_admins, avd_devices, lab_operators); this solution uses avd_users, avd_admins, lab_operators.", required: true, source: environment }
+  - { name: arc_onboard_sp_object_id, type: string, description: "Object id of the Arc onboarding service principal (New-AvdEntraGroups.ps1 -IncludeArcOnboardingPrincipal); empty skips its role assignment. ADDED; not yet in the schema.", required: false, default: "", source: environment }
+
+outputs:
+  - { name: rg_names,                      type: map,    description: "Resource group names keyed control, net, hosts, img, stor, mon, arc." }
+  - { name: arc_rg_name,                   type: string, description: "Arc machines resource group for the Hybrid hosts (HYB-02)." }
+  - { name: hostpool_rg,                   type: string, description: "Control-plane resource group (consumed by avd-control-plane and session-hosts-hybrid)." }
+  - { name: azl_spoke_vnet_name,           type: string, description: "Expected name of the Azure Local spoke VNet on the far side of the spoke-to-spoke peering." }
+  - { name: azl_spoke_vnet_name_matches,   type: bool,   description: "True when azl_spoke_vnet_id points at a VNet with exactly that name (guards against a wrong id)." }
+  - { name: spoke_vnet_id,                 type: string, description: "AVD spoke VNet id." }
+  - { name: subnet_hosts_id,               type: string, description: "Session-host subnet id (session-hosts-azure)." }
+  - { name: subnet_pe_id,                  type: string, description: "Private endpoint subnet id." }
+  - { name: subnet_imgbuild_id,            type: string, description: "Image Builder subnet id (avd-images)." }
+  - { name: subnet_dnsin_id,               type: string, description: "Resolver inbound subnet id." }
+  - { name: dns_resolver_id,               type: string, description: "DNS Private Resolver id; empty when enable_dns_private_resolver is false." }
+  - { name: dns_resolver_inbound_ip,       type: string, description: "Inbound endpoint IP for on-prem DNS (hybrid-hyperv-hosts.md §16.1); empty when disabled." }
+  - { name: privatelink_file_zone_id,      type: string, description: "privatelink.file.core.windows.net zone id (created or reused)." }
+  - { name: storage_account_id,            type: string, description: "FSLogix storage account id." }
+  - { name: storage_account_name,          type: string, description: "FSLogix storage account name." }
+  - { name: fslogix_profile_unc,           type: string, description: "UNC path of the profiles share." }
+  - { name: fslogix_odfc_unc,              type: string, description: "UNC path of the ODFC share." }
+  - { name: private_endpoint_id,           type: string, description: "Azure Files private endpoint id." }
+  - { name: recovery_vault_id,             type: string, description: "Recovery Services vault id; empty when enable_backup is false." }
+  - { name: gallery_id,                    type: string, description: "Compute Gallery id (avd-images)." }
+  - { name: image_definition_ids,          type: list,   description: "Image definition ids in the order of image_definitions." }
+  - { name: hostpool_identity_id,          type: string, description: "Host-pool user-assigned identity resource id." }
+  - { name: hostpool_identity_principal_id, type: string, description: "Host-pool identity principal id (for the cross-subscription Reader on the Azure Local VM RG, design §5.4)." }
+  - { name: hostpool_identity_client_id,   type: string, description: "Host-pool identity client id." }
+  - { name: aib_identity_id,               type: string, description: "Image Builder identity resource id." }
+  - { name: aib_identity_principal_id,     type: string, description: "Image Builder identity principal id." }
+  - { name: dcr_avd_insights_id,           type: string, description: "AVD Insights DCR id (associated by every session-host solution)." }
+
+secrets: []          # IaC reads no secret. Scripts write <org>-<token>-avd-demo-user-<name>-{username,password} and <org>-<token>-arc-onboarding-spn-{client-id,secret} (names only here).
+destroy: supported
+
+# Name catalog (contract §10): logical key -> naming-registry type (+ purpose/suffix). Rendered by New-NIC26ResourceName
+# at conversion time; the rendered IIC values are in bicep/main.example.bicepparam and terraform/terraform.example.tfvars.json
+# (tests/LzAvd.Parity.Tests.ps1 asserts them against the naming standard).
+names:
+  rg_control:            { type: rg,     purpose: avd }
+  rg_net:                { type: rg,     purpose: avd-net }
+  rg_hosts:              { type: rg,     purpose: avd-hosts }
+  rg_img:                { type: rg,     purpose: avd-img }
+  rg_stor:               { type: rg,     purpose: avd-stor }
+  rg_mon:                { type: rg,     purpose: avd-mon }
+  rg_arc:                { type: rg,     purpose: avd-arc }
+  spoke_vnet:            { type: vnet,   purpose: avd }
+  subnet_hosts:          { type: snet,   purpose: hosts }
+  subnet_pe:             { type: snet,   purpose: pe }
+  subnet_imgbuild:       { type: snet,   purpose: imgbuild }
+  subnet_dnsin:          { type: snet,   purpose: dnsin }
+  nsg_hosts:             { type: nsg,    purpose: avd-hosts }
+  nsg_pe:                { type: nsg,    purpose: avd-pe }
+  nsg_imgbuild:          { type: nsg,    purpose: avd-imgbuild }
+  nat_gateway:           { type: ng,     purpose: avd }
+  pip_nat:               { type: pip,    purpose: avd-natgw }
+  # Far-side spoke of the spoke-to-spoke peering; named exactly as lz-azure-local names it (same org, lab token and region).
+  azl_spoke_vnet:        { type: vnet,   purpose: azl }
+  # peer-<from>-to-<to>: from/to are catalog keys (resolved to the generated names) or literals
+  peer_spoke_to_hub:     { type: peer,   from: spoke_vnet,     to: hub }
+  peer_hub_to_spoke:     { type: peer,   from: hub,            to: spoke_vnet }
+  peer_spoke_to_azl:     { type: peer,   from: spoke_vnet,     to: azl_spoke_vnet }
+  peer_azl_to_spoke:     { type: peer,   from: azl_spoke_vnet, to: spoke_vnet }
+  # Azure-fixed zone name (naming standard 3b): passes through Test-NIC26ResourceName, never generated
+  file_zone:             { type: pdnszone, name: privatelink.file.core.windows.net }
+  link_avd:              { type: link,   purpose: avd }
+  link_azl:              { type: link,   purpose: azl }
+  link_identity:         { type: link,   purpose: identity }
+  link_hub:              { type: link,   purpose: hub }
+  dns_resolver:          { type: dnspr,  purpose: avd }
+  dns_resolver_inbound:  { type: dnspr,  purpose: avd-in }
+  fslogix_sa:            { type: st,     purpose: fslogix }
+  fslogix_pe:            { type: pep,    purpose: fslogix }
+  recovery_vault:        { type: rsv,    purpose: avd }
+  backup_policy:         { type: bkp,    purpose: fslogix }
+  gallery:               { type: gal }
+  hostpool_identity:     { type: id,     purpose: avd-hostpool }
+  aib_identity:          { type: id,     purpose: aib }
+  dcr_avd_insights:      { type: dcr,    purpose: avd-insights }
+  alert_hostunavailable: { type: alert,  purpose: avd-hostunavailable }
+  alert_fslogixerror:    { type: alert,  purpose: avd-fslogixerror }
+  alert_connfail:        { type: alert,  purpose: avd-connfail }
+  budget:                { type: budget, purpose: avd }
+  # type `role` = custom RBAC role definition (template {type}-{org}-{token}-{purpose}; registry entry added 2026-10-03)
+  role_aib_image:        { type: role,   purpose: aib-image }
+  role_aib_network:      { type: role,   purpose: aib-network }
+  asg_allowed_locations: { type: asg,    purpose: allowed-locations }
+  asg_require_tags:      { type: asg,    purpose: require-tags }
+  asg_inherit_tags:      { type: asg,    purpose: inherit-tags }
+  asg_no_public_ip:      { type: asg,    purpose: no-public-ip }
+  asg_storage_hygiene:   { type: asg,    purpose: storage-hygiene }

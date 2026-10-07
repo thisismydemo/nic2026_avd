@@ -1,0 +1,27 @@
+{
+  "iso_path": "example/windows11-enterprise.iso",
+  "iso_checksum": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "vm_name": "example-build",
+  "output_directory": "example-output",
+  "switch_name": "example-switch",
+  "vlan_id": 0,
+  "cpus": 4,
+  "memory_mb": 8192,
+  "disk_size_mb": 131072,
+  "build_username": "example-builder",
+  "customizer_directory": "example/shared/customizers",
+  "customizer_tokens": {
+    "install_teams_app": "true",
+    "disable_teams_autoupdate": "false"
+  },
+  "winrm_timeout": "2h",
+  "image_version": "0.0.1",
+  "arc_agent_uri": "https://aka.ms/AzureConnectedMachineAgent",
+  "arc_agent_directory": "example-arc-installer",
+  "shortpath_port": 3390,
+  "defender_paths": "",
+  "defender_processes": "",
+  "vdot_archive_uri": "",
+  "vdot_archive_sha256": "",
+  "product_key": ""
+}

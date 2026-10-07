@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrxProfileFolderRedirection ExcludeCommonFolders="0">
+  <Excludes>
+    <Exclude Copy="0">AppData\Local\Microsoft\Edge\User Data\Default\Cache</Exclude>
+    <Exclude Copy="0">AppData\Local\Microsoft\Edge\User Data\Default\Code Cache</Exclude>
+    <Exclude Copy="0">AppData\Local\Microsoft\Edge\User Data\Default\GPUCache</Exclude>
+    <Exclude Copy="0">AppData\Local\Google\Chrome\User Data\Default\Cache</Exclude>
+    <Exclude Copy="0">AppData\Local\Google\Chrome\User Data\Default\Code Cache</Exclude>
+    <Exclude Copy="0">AppData\Local\Google\Chrome\User Data\Default\GPUCache</Exclude>
+    <Exclude Copy="0">AppData\Local\Temp</Exclude>
+    <Exclude Copy="0">AppData\Local\Microsoft\Windows\INetCache</Exclude>
+    <Exclude Copy="0">AppData\Local\Packages\MSTeams_8wekyb3d8bbwe\LocalCache\Microsoft\MSTeams\Logs</Exclude>
+    <Exclude Copy="0">AppData\Local\CrashDumps</Exclude>
+    <Exclude Copy="0">AppData\Local\Microsoft\Windows\WER</Exclude>
+  </Excludes>
+</FrxProfileFolderRedirection>

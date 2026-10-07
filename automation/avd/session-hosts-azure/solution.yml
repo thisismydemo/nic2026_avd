@@ -1,0 +1,49 @@
+name: avd-session-hosts-azure
+description: AVD session hosts as Azure VMs (Trusted Launch, Entra joined) registered to the host pool with a protected Run Command
+scope: avd
+tools: [bicep, terraform, powershell]
+depends_on: [lz-avd, avd-control-plane, avd-images-azure]
+
+inputs:
+  - { name: org, type: string, description: "Organization identifier.", required: true, source: environment }
+  - { name: lab_token, type: string, description: "Lab token.", required: true, source: environment, path: token }
+  - { name: location, type: string, description: "Azure deployment region.", required: true, source: environment }
+  - { name: location_short, type: string, description: "Short region identifier.", required: true, source: environment }
+  - { name: tenant_id, type: string, description: "Microsoft Entra tenant ID.", required: true, source: environment }
+  - { name: subscription_id_avd, type: string, description: "AVD subscription ID.", required: true, source: environment }
+  - { name: resource_group_name, type: string, description: "Resource group that receives the session-host VMs (Terraform; Bicep deploys into the group chosen by the wrapper).", required: true, source: generated }
+  - { name: tags, type: map, description: "Resource tags.", required: true, source: environment }
+  - { name: names, type: map, description: "Generated resource-name catalog.", required: true, source: generated }
+  - { name: host_count, type: int, description: "Number of Azure session hosts; supported range is 1-2.", required: true, source: environment, path: host_pools.azure.session_host_count }
+  - { name: session_host_sku_azure, type: string, description: "Azure session-host VM size.", required: true, source: environment }
+  - { name: os_disk_sku, type: string, description: "OS disk storage SKU (Premium_LRS, StandardSSD_LRS, ...).", required: false, default: "Premium_LRS", source: environment }
+  - { name: os_disk_size_gb, type: int, description: "OS disk size in GB.", required: false, default: 128, source: environment }
+  - { name: session_host_zones, type: list, description: "Nonempty list of availability zones, each numbered 1-3.", required: true, source: environment }
+  - { name: hosts_subnet_id, type: string, description: "Session-host subnet resource ID from lz-avd.", required: true, source: generated }
+  - { name: image_version_id, type: string, description: "Compute Gallery image-version resource ID from avd-images-azure.", required: true, source: generated }
+  - { name: dcr_id, type: string, description: "AVD Insights DCR resource ID from lz-avd.", required: true, source: generated }
+  - { name: encryption_at_host, type: bool, description: "Enable encryption at host.", required: false, default: true, source: environment }
+  - { name: hostpool_name, type: string, description: "Host-pool name from avd-control-plane; used only by the registration script.", required: true, source: generated }
+  - { name: hostpool_rg, type: string, description: "Host-pool resource group from avd-control-plane; used only by the registration script.", required: true, source: generated }
+  - { name: local_admin_username_secret, type: secret-ref, description: "keyvault:// reference for the logical secret avd-sessionhost-local-admin; resolved in memory by scripts/Invoke-SessionHostsAzureDeploy.ps1.", required: true, source: keyvault, path: secret_refs.sessionhost_local_admin_username }
+  - { name: local_admin_password_secret, type: secret-ref, description: "keyvault:// reference for the logical secret avd-sessionhost-local-admin; resolved in memory by scripts/Invoke-SessionHostsAzureDeploy.ps1.", required: true, source: keyvault, path: secret_refs.sessionhost_local_admin_password }
+
+outputs:
+  - { name: session_host_ids, type: list, description: "Session-host VM resource IDs." }
+  - { name: session_host_names, type: list, description: "Session-host computer names." }
+  - { name: vm_principal_ids, type: list, description: "VM system-assigned identity principal IDs." }
+
+secrets: [avd-sessionhost-local-admin]
+destroy: supported
+
+names:
+  vm_azure_1: { type: vm, purpose: avd-az, instance: 1 }
+  cn_azure_1: { type: sessionhost, purpose: az, instance: 1 }
+  nic_azure_1: { type: nic, parent: vm_azure_1 }
+  osdisk_azure_1: { type: osdisk, parent: vm_azure_1 }
+  vm_azure_2: { type: vm, purpose: avd-az, instance: 2 }
+  cn_azure_2: { type: sessionhost, purpose: az, instance: 2 }
+  nic_azure_2: { type: nic, parent: vm_azure_2 }
+  osdisk_azure_2: { type: osdisk, parent: vm_azure_2 }
+  dcr_assoc: { type: dcra, purpose: avd-azure }
+  deployment_name: { type: dep, purpose: avd-session-hosts-azure }

@@ -1,0 +1,135 @@
+// lz-avd example parameters — IIC values and all-zero GUIDs only (contract §3, §7).
+// The real file main.generated.bicepparam is produced by ConvertTo-NIC26BicepParam -Solution lz-avd and is git-ignored.
+using './main.bicep'
+
+param org = 'iic'
+param lab_token = 'nic26'
+param location = 'eastus'
+param location_short = 'eus'
+param tenant_id = '00000000-0000-0000-0000-000000000000'
+param subscription_id_avd = '00000000-0000-0000-0000-000000000000'
+param subscription_id_azl = '00000000-0000-0000-0000-000000000000'
+param management_group_id = 'mg-iic-landingzones'
+param owner_email = 'owner@contoso.com'
+param tags = {
+  project: 'nic26'
+  workload: 'avd'
+  environment: 'demo'
+  owner: 'owner@contoso.com'
+  'managed-by': 'bicep'
+  'cost-center': 'iic-lab'
+  lifecycle: 'temporary'
+}
+param names = {
+  rg_control: 'rg-iic-nic26-avd-eus-01'
+  rg_net: 'rg-iic-nic26-avd-net-eus-01'
+  rg_hosts: 'rg-iic-nic26-avd-hosts-eus-01'
+  rg_img: 'rg-iic-nic26-avd-img-eus-01'
+  rg_stor: 'rg-iic-nic26-avd-stor-eus-01'
+  rg_mon: 'rg-iic-nic26-avd-mon-eus-01'
+  rg_arc: 'rg-iic-nic26-avd-arc-eus-01'
+  spoke_vnet: 'vnet-iic-nic26-avd-eus-01'
+  subnet_hosts: 'snet-iic-nic26-hosts'
+  subnet_pe: 'snet-iic-nic26-pe'
+  subnet_imgbuild: 'snet-iic-nic26-imgbuild'
+  subnet_dnsin: 'snet-iic-nic26-dnsin'
+  nsg_hosts: 'nsg-iic-nic26-avd-hosts-eus-01'
+  nsg_pe: 'nsg-iic-nic26-avd-pe-eus-01'
+  nsg_imgbuild: 'nsg-iic-nic26-avd-imgbuild-eus-01'
+  nat_gateway: 'ng-iic-nic26-avd-eus-01'
+  pip_nat: 'pip-iic-nic26-avd-natgw-eus-01'
+  azl_spoke_vnet: 'vnet-iic-nic26-azl-eus-01'
+  peer_spoke_to_hub: 'peer-vnet-iic-nic26-avd-eus-01-to-hub'
+  peer_hub_to_spoke: 'peer-hub-to-vnet-iic-nic26-avd-eus-01'
+  peer_spoke_to_azl: 'peer-vnet-iic-nic26-avd-eus-01-to-vnet-iic-nic26-azl-eus-01'
+  peer_azl_to_spoke: 'peer-vnet-iic-nic26-azl-eus-01-to-vnet-iic-nic26-avd-eus-01'
+  file_zone: 'privatelink.file.core.windows.net'
+  link_avd: 'link-iic-nic26-avd'
+  link_azl: 'link-iic-nic26-azl'
+  link_identity: 'link-iic-nic26-identity'
+  link_hub: 'link-iic-nic26-hub'
+  dns_resolver: 'dnspr-iic-nic26-avd-eus-01'
+  dns_resolver_inbound: 'dnspr-iic-nic26-avd-in-eus-01'
+  fslogix_sa: 'stiicnic26fslogixeus01'
+  fslogix_pe: 'pep-iic-nic26-fslogix-eus-01'
+  recovery_vault: 'rsv-iic-nic26-avd-eus-01'
+  backup_policy: 'bkp-iic-nic26-fslogix-eus-01'
+  gallery: 'galiicnic26eus01'
+  hostpool_identity: 'id-iic-nic26-avd-hostpool-eus-01'
+  aib_identity: 'id-iic-nic26-aib-eus-01'
+  dcr_avd_insights: 'dcr-iic-nic26-avd-insights-eus-01'
+  alert_hostunavailable: 'alert-iic-nic26-avd-hostunavailable-eus-01'
+  alert_fslogixerror: 'alert-iic-nic26-avd-fslogixerror-eus-01'
+  alert_connfail: 'alert-iic-nic26-avd-connfail-eus-01'
+  budget: 'budget-iic-nic26-avd-01'
+  role_aib_image: 'role-iic-nic26-aib-image'
+  role_aib_network: 'role-iic-nic26-aib-network'
+  asg_allowed_locations: 'asg-iic-nic26-allowed-locations'
+  asg_require_tags: 'asg-iic-nic26-require-tags'
+  asg_inherit_tags: 'asg-iic-nic26-inherit-tags'
+  asg_no_public_ip: 'asg-iic-nic26-no-public-ip'
+  asg_storage_hygiene: 'asg-iic-nic26-storage-hygiene'
+}
+param hub_vnet_id = '/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-iic-connectivity/providers/Microsoft.Network/virtualNetworks/vnet-iic-hub'
+param hub_address_space = '10.100.0.0/22'
+param identity_spoke_vnet_id = '/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-iic-identity/providers/Microsoft.Network/virtualNetworks/vnet-iic-identity'
+param p2s_pool = '172.30.100.0/24'
+param onprem_compute_prefixes = ['192.168.120.0/24']
+param bastion_subnet_prefix = '10.100.0.64/26'
+param azl_spoke_vnet_id = '/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-iic-nic26-azl-net-eus-01/providers/Microsoft.Network/virtualNetworks/vnet-iic-nic26-azl-eus-01'
+param azl_spoke_prefix = '10.100.6.0/24'
+param log_analytics_workspace_id = '/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-iic-nic26-azl-mon-eus-01/providers/Microsoft.OperationalInsights/workspaces/law-iic-nic26-eus-01'
+param key_vault_id = '/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-iic-nic26-azl-sec-eus-01/providers/Microsoft.KeyVault/vaults/kv-iic-nic26-ops-eus-01'
+param action_group_id = '/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-iic-nic26-azl-mon-eus-01/providers/Microsoft.Insights/actionGroups/ag-iic-nic26-ops-eus-01'
+param avd_vnet_prefix = '10.100.8.0/22'
+param avd_subnets = {
+  hosts: '10.100.8.0/24'
+  pe: '10.100.9.0/26'
+  imgbuild: '10.100.9.64/26'
+  dnsin: '10.100.9.128/28'
+}
+param enable_private_endpoints = false
+param enable_dns_private_resolver = false
+param dns_resolver_inbound_ip = '10.100.9.132'
+param privatelink_file_zone_id = ''
+param link_privatelink_zone_to_hub = false
+param share_names = {
+  profiles: 'nic26-fslogix-profiles'
+  odfc: 'nic26-fslogix-odfc'
+}
+param share_quota_gib = 256
+param enable_backup = true
+param backup_policy = {
+  schedule_time_utc: '03:00'
+  retention_days: 7
+}
+param image_definitions = [
+  {
+    name: 'imgdef-iic-nic26-win11-avd'
+    publisher: 'iic'
+    offer: 'win11-avd'
+    sku: '25h2-multisession'
+    os_type: 'Windows'
+    hyper_v_generation: 'V2'
+    security_type: 'TrustedLaunch'
+    os_state: 'Generalized'
+  }
+  {
+    name: 'imgdef-iic-nic26-win11-ent'
+    publisher: 'iic'
+    offer: 'win11-ent'
+    sku: '25h2-ent'
+    os_type: 'Windows'
+    hyper_v_generation: 'V2'
+    security_type: 'TrustedLaunch'
+    os_state: 'Generalized'
+  }
+]
+param avd_budget_monthly = 1500
+param enable_policy_assignments = true
+param group_object_ids = {
+  avd_users: '00000000-0000-0000-0000-000000000000'
+  avd_admins: '00000000-0000-0000-0000-000000000000'
+  lab_operators: '00000000-0000-0000-0000-000000000000'
+}
+param arc_onboard_sp_object_id = ''

@@ -1,0 +1,47 @@
+name: avd-session-hosts-azure-local
+description: AVD session hosts as Azure Local VMs (Arc VM resources) registered to the host pool with a protected Arc Run Command
+scope: avd
+tools: [bicep, terraform, powershell]
+depends_on: [lz-azure-local, lz-avd, avd-control-plane, avd-images-azure-local]
+
+inputs:
+  - { name: org, type: string, description: "Organization identifier.", required: true, source: environment }
+  - { name: lab_token, type: string, description: "Lab token (not an AVD registration token).", required: true, source: environment, path: token }
+  - { name: location, type: string, description: "Azure region of the Arc machines.", required: true, source: environment }
+  - { name: location_short, type: string, description: "Short region identifier.", required: true, source: environment }
+  - { name: tenant_id, type: string, description: "Microsoft Entra tenant ID.", required: true, source: environment }
+  - { name: subscription_id_azl, type: string, description: "Azure Local subscription ID.", required: true, source: environment }
+  - { name: resource_group_name, type: string, description: "Resource group that receives the session-host Arc machines (Terraform; Bicep deploys into the group chosen by the wrapper).", required: true, source: generated }
+  - { name: tags, type: map, description: "Resource tags.", required: true, source: environment }
+  - { name: names, type: map, description: "Generated resource-name catalog.", required: true, source: generated }
+  - { name: host_count, type: int, description: "Number of Azure Local session hosts; supported range is 1-2.", required: true, source: environment, path: host_pools.azl.session_host_count }
+  - { name: vcpu, type: int, description: "Virtual processors per host (design: 4).", required: false, default: 4, source: environment }
+  - { name: memory_mb, type: int, description: "Memory in MB per host (design: 16 GB).", required: false, default: 16384, source: environment }
+  - { name: custom_location_id, type: string, description: "Custom-location resource ID of the cluster (lz-azure-local / cluster-deploy output).", required: true, source: generated }
+  - { name: logical_network_id, type: string, description: "Logical-network resource ID for the AVD hosts (cluster-configure output).", required: true, source: generated }
+  - { name: image_id, type: string, description: "Resource ID of the image already on the cluster (avd-images-azure-local output).", required: true, source: generated }
+  - { name: dcr_id, type: string, description: "AVD Insights DCR resource ID from lz-avd.", required: true, source: generated }
+  - { name: entra_join_extension, type: bool, description: "Install the AADLoginForWindows Arc extension (flagged first-day test on Azure Local VMs).", required: false, default: true, source: environment }
+  - { name: enable_monitoring, type: bool, description: "Install Azure Monitor Agent and associate the DCR.", required: false, default: true, source: environment }
+  - { name: hostpool_name, type: string, description: "Host-pool name from avd-control-plane; used only by the registration script.", required: true, source: generated }
+  - { name: hostpool_rg, type: string, description: "Host-pool resource group from avd-control-plane; used only by the registration script.", required: true, source: generated }
+  - { name: local_admin_username_secret, type: secret-ref, description: "keyvault:// reference for the logical secret avd-sessionhost-local-admin; resolved in memory by scripts/Invoke-SessionHostsAzureLocalDeploy.ps1.", required: true, source: keyvault, path: secret_refs.sessionhost_local_admin_username }
+  - { name: local_admin_password_secret, type: secret-ref, description: "keyvault:// reference for the logical secret avd-sessionhost-local-admin; resolved in memory by scripts/Invoke-SessionHostsAzureLocalDeploy.ps1.", required: true, source: keyvault, path: secret_refs.sessionhost_local_admin_password }
+
+outputs:
+  - { name: machine_ids, type: list, description: "Arc machine resource IDs of the session hosts." }
+  - { name: computer_names, type: list, description: "Session-host computer names." }
+  - { name: machine_principal_ids, type: list, description: "Arc machine system-assigned identity principal IDs." }
+
+secrets: [avd-sessionhost-local-admin]
+destroy: supported
+
+names:
+  vm_azl_1: { type: vmazl, purpose: avd, instance: 1 }
+  cn_azl_1: { type: sessionhost, purpose: al, instance: 1 }
+  nic_azl_1: { type: nic, parent: vm_azl_1 }
+  vm_azl_2: { type: vmazl, purpose: avd, instance: 2 }
+  cn_azl_2: { type: sessionhost, purpose: al, instance: 2 }
+  nic_azl_2: { type: nic, parent: vm_azl_2 }
+  dcr_assoc: { type: dcra, purpose: avd-azl }
+  deployment_name: { type: dep, purpose: avd-session-hosts-azure-local }

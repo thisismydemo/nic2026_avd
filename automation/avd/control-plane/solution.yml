@@ -1,0 +1,60 @@
+# avd-control-plane — AVD control plane manifest (automation/CONTRACT.md §2, §10)
+# Implements design/avd/landing-zone.md §6 (AVD-LZ-09): one workspace, three host pools (azure / azl / hybrid), one desktop
+# application group per pool, one scaling plan (Azure pool), the shared host-pool user-assigned identity on all three pools,
+# group assignments and diagnostics. Registration tokens are NEVER created, stored or output by IaC (K-7, design §6.4):
+# scripts/New-AvdRegistrationToken.ps1 returns one in memory to the consuming session-host solution.
+name: avd-control-plane
+description: AVD workspace, three host pools (Azure pooled multi-session with scaling plan, Azure Local pooled multi-session, Hybrid pooled single-session MaxSessionLimit 1), desktop application groups, group assignments, shared host-pool identity and diagnostics.
+scope: avd
+tools: [bicep, terraform]
+depends_on: [lz-avd]
+
+inputs:
+  # --- naming and placement (shared environment file; design §11.5) ---
+  - { name: org,                  type: string, description: "Organization token in every name (D-006).", required: true, source: environment }
+  - { name: lab_token,            type: string, description: "Lab/conference token in every name (D-005); shared schema key `token`.", required: true, source: environment, path: token }
+  - { name: location,             type: string, description: "Azure region for every regional resource (D-010); AVD metadata location.", required: true, source: environment }
+  - { name: location_short,       type: string, description: "Short region token used in names.", required: true, source: environment }
+  - { name: tenant_id,            type: string, description: "Entra tenant id (D-002).", required: true, source: environment }
+  - { name: subscription_id_avd,  type: string, description: "AVD landing-zone subscription id (D-004); the deployment subscription.", required: true, source: environment }
+  - { name: subscription_id_azl,  type: string, description: "Azure Local landing-zone subscription id (D-004); informational for the cross-subscription Reader (design §5.4).", required: true, source: environment }
+  - { name: tags,                 type: map,    description: "The seven required tags (naming standard §3a); workload=avd and managed-by are added per track.", required: true, source: environment }
+  - { name: names,                type: map,    description: "Name catalog resolved by ConvertTo-NIC26BicepParam / ConvertTo-NIC26TfVars from the names section below (contract §10).", required: true, source: generated }
+
+  # --- control plane (design §6.1, §6.2, §6.3; schema keys host_pools, rdp_properties, scaling_plan) ---
+  - { name: host_pools,           type: map,    description: "Per-realm host pool settings keyed azure, azl, hybrid: type, load_balancer, max_session_limit, start_vm_on_connect, validation_environment, session_host_count, friendly_name, preferred_app_group_type.", required: true, source: environment }
+  - { name: rdp_properties,       type: string, description: "Custom RDP property string identical on all three pools (design §6.2; enablerdsaadauth:i:1 = Entra SSO).", required: true, source: environment }
+  - { name: scaling_plan,         type: map,    description: "Scaling plan: time_zone, assigned_pools, exclusion_tag?, schedules[] (design §6.1).", required: true, source: environment }
+  - { name: enable_scaling_plan,  type: bool,   description: "Deploy the scaling plan for the Azure pool. ADDED flag; not yet in avd.environment.schema.json.", required: false, default: true, source: environment }
+  - { name: workspace_friendly_name, type: string, description: "Workspace friendly name shown in Windows App (design §6.1). ADDED; not yet in the schema.", required: false, default: "Infinite Improbability Corp", source: environment }
+  - { name: registration_token_ttl_hours, type: int, description: "Registration token lifetime used by scripts/New-AvdRegistrationToken.ps1 (K-7, <= 24 h). Not used by IaC.", required: true, source: environment }
+
+  # --- identity and monitoring (design §5.3, §9.2) ---
+  - { name: group_object_ids,     type: map,    description: "Object ids of the AVD groups (schema keys avd_azure, avd_azl, avd_hybrid, ...); the three realm groups get Desktop Virtualization User on their application group.", required: true, source: environment }
+  - { name: avd_service_principal_object_id, type: string, description: "Object id of the Azure Virtual Desktop first-party service principal in this tenant (Get-AzADServicePrincipal -DisplayName 'Azure Virtual Desktop'); grants Desktop Virtualization Power On Off Contributor at subscription scope for the scaling plan and Start VM on Connect. Empty skips the assignment (design §5.3 says verify it is not already assigned higher up). ADDED; not yet in the schema.", required: false, default: "", source: environment }
+  - { name: log_analytics_workspace_id, type: string, description: "Lab workspace law-* (lz-azure-local output) for the AVD diagnostic settings (AVD-LZ-12); empty skips diagnostics.", required: true, source: environment }
+
+outputs:
+  - { name: workspace_id,         type: string, description: "AVD workspace resource id." }
+  - { name: workspace_name,       type: string, description: "AVD workspace name." }
+  - { name: hostpool_ids,         type: map,    description: "Host pool resource ids keyed azure, azl, hybrid (session-hosts-* and demo scripts)." }
+  - { name: hostpool_names,       type: map,    description: "Host pool names keyed azure, azl, hybrid (New-AvdRegistrationToken.ps1 -HostPoolName)." }
+  - { name: application_group_ids, type: map,   description: "Desktop application group ids keyed azure, azl, hybrid (Switch-UserHostPool demo script)." }
+  - { name: scaling_plan_id,      type: string, description: "Scaling plan id; empty when enable_scaling_plan is false." }
+  - { name: hostpool_rg,          type: string, description: "Control-plane resource group (where registration tokens are generated)." }
+
+secrets: []          # No Key Vault secret is read. Registration tokens are generated at join time and never stored (K-7).
+destroy: supported
+
+names:
+  rg_control:          { type: rg,        purpose: avd }
+  workspace:           { type: vdws }
+  hostpool_azure:      { type: vdpool,    purpose: azure }
+  hostpool_azl:        { type: vdpool,    purpose: azl }
+  hostpool_hybrid:     { type: vdpool,    purpose: hybrid }
+  appgroup_azure:      { type: vdag,      purpose: azure }
+  appgroup_azl:        { type: vdag,      purpose: azl }
+  appgroup_hybrid:     { type: vdag,      purpose: hybrid }
+  scaling_plan_azure:  { type: vdscaling, purpose: azure }
+  hostpool_identity:   { type: id,        purpose: avd-hostpool }
+  deployment_name:     { type: dep,       purpose: avd-control-plane }

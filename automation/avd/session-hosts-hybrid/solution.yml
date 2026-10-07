@@ -1,0 +1,98 @@
+# session-hosts-hybrid — AVD Hybrid session hosts on plain Hyper-V VMs (automation/CONTRACT.md §2, §10, §11, §12)
+# Implements design/avd/hybrid-hyperv-hosts.md (HYB-01..09, §4-§7, §9, §11, §12, §14, §15, §16.1) and the Arc-side
+# pieces of design/avd/landing-zone.md §5.3 / §9.2. Values live in environment/shared/*.yml and environment/avd/*.yml
+# (schemas: automation/shared/schemas/*.environment.schema.json), never here. `path` selects the schema key when the
+# design's canonical name differs (contract §11: hybrid VM data lives in hybrid.vms[] + dhcp_reservations[]).
+# Secrets appear as LOGICAL names only (contract §12); the real name is <secret_name_prefix><logical name>.
+name: session-hosts-hybrid
+description: AVD Hybrid realm — two Gen 2 Hyper-V VMs as clustered roles on the Azure Local cluster (outside Azure Local VM management), Entra-joined by provisioning package, Arc-enabled, registered through the AVD CloudDeviceExtension; Arc-RG RBAC and AMA/DCR association in Bicep and Terraform.
+scope: avd
+tools: [bicep, terraform, powershell]
+depends_on: [lz-avd, avd-control-plane, avd-images-packer-hyperv]
+
+inputs:
+  # --- naming and placement (shared environment file) ----------------------------------------------------------------
+  - { name: org,                        type: string, description: "Organization token in every name (D-006).", required: true, source: environment }
+  - { name: lab_token,                  type: string, description: "Lab/conference token in every name (D-005); shared schema key `token`.", required: true, source: environment, path: token }
+  - { name: location,                   type: string, description: "Azure region of the Arc machines and extensions (design §16.1 arc_location = location, D-010).", required: true, source: environment }
+  - { name: location_short,             type: string, description: "Short region token used in names.", required: true, source: environment }
+  - { name: tenant_id,                  type: string, description: "Entra tenant id (D-002); azcmagent connect --tenant-id.", required: true, source: environment }
+  - { name: subscription_id_avd,        type: string, description: "AVD landing-zone subscription id (D-004); holds the Arc resource group (HYB-02).", required: true, source: environment }
+  - { name: tags,                       type: map,    description: "The required tags (naming standard §3a); realm/hypervisor/cluster/node tags are added per machine from arc_tags.", required: true, source: environment }
+  - { name: names,                      type: map,    description: "Name catalog resolved by the converters from the names section below (contract §10).", required: true, source: generated }
+
+  # --- cluster and VM design (design §4, §16.1; schema hybrid.*) -------------------------------------------------------
+  - { name: cluster_name,               type: string, description: "Failover cluster name (D-009).", required: true, source: environment, path: hybrid.cluster_name }
+  - { name: hybrid_csv_path,            type: string, description: "CSV root holding images\\ and hyperv\\ (HYB-03 layout).", required: true, source: environment, path: hybrid.csv_path }
+  - { name: compute_switch_name,        type: string, description: "Network ATC compute switch name pattern; discovered on the node by -like match, never created or renamed (design §5.1).", required: true, source: environment, path: hybrid.compute_switch_name }
+  - { name: hybrid_vlan_id,             type: int,    description: "Access VLAN of the VM NICs (P-08: the AVD-hosts VLAN).", required: true, source: environment, path: hybrid.vlan_id }
+  - { name: hybrid_vcpu,                type: int,    description: "vCPU per VM (design §4.1).", required: true, source: environment, path: hybrid.vcpu }
+  - { name: hybrid_memory_gb,           type: int,    description: "Static memory per VM in GB (design §4.1).", required: true, source: environment, path: hybrid.memory_gb }
+  - { name: hybrid_disk_gb,             type: int,    description: "OS VHDX size in GB (dynamic; design §4.1).", required: true, source: environment, path: hybrid.disk_gb }
+  - { name: hybrid_vms,                 type: list,   description: "VM list {name, owner_node, mac_address, ip_address} (design §16.1 hybrid_vm_names + hybrid_node_map + hybrid_mac_addresses + hybrid_ip_reservations, merged per contract §11).", required: true, source: environment, path: hybrid.vms }
+  - { name: arc_tags,                   type: map,    description: "Extra Arc machine tags (realm, hypervisor, cluster); node=<owner> is added per machine (design §3).", required: true, source: environment, path: hybrid.arc_tags }
+  - { name: dhcp_reservations,          type: list,   description: "DHCP reservations {hostname, mac, ip, vlan_id} emitted by Set-HybridVmDhcpData.ps1 for your DHCP server or network automation (HYB-04).", required: true, source: environment }
+  - { name: hybrid_image_vhdx,          type: string, description: "Packer master VHDX (relative to hybrid_csv_path or absolute); produced by avd/images/packer-hyperv (design §4.3).", required: true, source: environment, path: images.hybrid_image_vhdx }
+
+  # --- DNS handed out by the reservation (design §5.2/5.3; P-07 final choice pending) ---------------------------------
+  - { name: dns_resolver_inbound_ip,    type: string, description: "Primary DNS for the hosts (Private Resolver inbound endpoint, lz-avd output) until P-07 is decided.", required: true, source: environment }
+  - { name: secondary_dns_ip,           type: string, description: "Fallback DNS for the hosts (design §5.3).", required: true, source: environment }
+
+  # --- AVD / monitoring (design §9, §11) -----------------------------------------------------------------------------
+  - { name: registration_token_ttl_hours, type: int,  description: "Registration token lifetime in hours (HYB-07, K-7; refused above 24).", required: true, source: environment }
+  - { name: share_names,                type: map,    description: "FSLogix share names keyed profiles and odfc; the UNC paths (fslogix_profile_unc / fslogix_odfc_unc) are built from names.fslogix_sa + these (design §9.3).", required: true, source: environment }
+  - { name: shortpath_managed_port,     type: int,    description: "RDP Shortpath managed-networks listener port (design §9.3).", required: true, source: environment }
+  - { name: patch_channel,              type: string, description: "intune or wufb-local (HYB-08, P-02); informational for the host checker.", required: true, source: environment }
+  - { name: dcr_avd_insights_id,        type: string, description: "AVD Insights DCR resource id (lz-avd output); empty = derived from names.rg_mon + names.dcr_avd_insights in this subscription. ADDED optional.", required: false, default: "", source: environment }
+  - { name: hostpool_identity_principal_id, type: string, description: "Host-pool identity principal id (lz-avd output); empty = looked up from names.hostpool_identity in names.rg_control. ADDED optional.", required: false, default: "", source: environment }
+  - { name: enable_arc_extensions,      type: bool,   description: "Declare AMA + the DCR association on the Arc machines in IaC. False until Install-ArcAgent.ps1 has connected both machines (the resources must exist). ADDED flag.", required: false, default: false, source: environment }
+
+  # --- RBAC on the Arc resource group (design §5.3; lz-avd also assigns these — see README 'Ownership') -----------------
+  - { name: manage_arc_rg_rbac,         type: bool,   description: "Own the Arc-RG role assignments here (host-pool Reader, user sign-in roles, onboarding role). Default false because lz-avd assigns them; set true only when lz-avd's assignments are removed. ADDED flag.", required: false, default: false, source: environment }
+  - { name: assign_vm_login_roles,      type: bool,   description: "Assign Virtual Machine User/Administrator Login on the Arc RG (AVD-LZ-08 first-day test: sign-in authorization on Microsoft.HybridCompute machines is undocumented for AVD Hybrid). ADDED flag.", required: false, default: true, source: environment }
+  - { name: group_object_ids,           type: map,    description: "Object ids of the AVD groups (schema keys avd_users, avd_admins, ...).", required: true, source: environment }
+  - { name: arc_onboard_sp_object_id,   type: string, description: "Object id of spn-<org>-<lab>-arc-onboard; empty skips the Azure Connected Machine Onboarding assignment.", required: true, source: environment }
+
+  # --- secrets (keyvault:// references, names only; resolved in memory on the Windows jump server) ---------------------
+  - { name: secret_name_prefix,         type: string, description: "Key Vault secret-name prefix (contract §12); real name = <secret_name_prefix><logical name>.", required: true, source: environment }
+  - { name: hybrid_local_admin_username, type: secret-ref, description: "Local administrator user name for the VMs (unattend, PowerShell Direct).", required: true, source: keyvault, path: secret_refs.hybrid_local_admin_username }
+  - { name: hybrid_local_admin_password, type: secret-ref, description: "Local administrator password for the VMs.", required: true, source: keyvault, path: secret_refs.hybrid_local_admin_password }
+  - { name: arc_onboarding_client_id,   type: secret-ref, description: "Client id of spn-<org>-<lab>-arc-onboard (HYB-06).", required: true, source: keyvault, path: secret_refs.arc_onboarding_client_id }
+  - { name: arc_onboarding_secret,      type: secret-ref, description: "Client secret of spn-<org>-<lab>-arc-onboard (HYB-06).", required: true, source: keyvault, path: secret_refs.arc_onboarding_secret }
+  - { name: entra_bulk_token,           type: secret-ref, description: "Base64 provisioning package carrying the Entra bulk-enrollment token (HYB-05; 30-day lifetime).", required: true, source: keyvault, path: secret_refs.entra_bulk_token }
+
+outputs:
+  - { name: arc_rg_name,            type: string, description: "Arc machines resource group (HYB-02)." }
+  - { name: arc_rg_id,              type: string, description: "Arc machines resource group id (scope of the Reader / sign-in / onboarding assignments)." }
+  - { name: hostpool_hybrid_name,   type: string, description: "Hybrid host pool name the hosts register to." }
+  - { name: hostpool_rg,            type: string, description: "Control-plane resource group holding the host pool." }
+  - { name: expected_host_names,    type: list,   description: "Computer / Arc / session-host names from the name catalog (<lab>-avd-hv01, <lab>-avd-hv02); Test-HybridHost.ps1 compares them with hybrid_vms." }
+  - { name: arc_machine_ids,        type: list,   description: "Arc machine resource ids (empty until enable_arc_extensions is true)." }
+  - { name: ama_extension_ids,      type: list,   description: "AzureMonitorWindowsAgent extension ids (empty until enable_arc_extensions is true)." }
+  - { name: dcr_association_ids,    type: list,   description: "DCR association ids (empty until enable_arc_extensions is true)." }
+  - { name: role_assignment_count,  type: int,    description: "Number of Arc-RG role assignments this solution owns (0 when manage_arc_rg_rbac is false)." }
+
+secrets:
+  - hyperv-hybrid-local-admin-username
+  - hyperv-hybrid-local-admin-password
+  - arc-onboarding-spn-client-id
+  - arc-onboarding-spn-secret
+  - avd-entra-bulktoken-secret
+destroy: supported
+
+# Name catalog (contract §10). Rendered IIC values are in bicep/main.example.bicepparam and
+# terraform/terraform.example.tfvars.json (tests/SessionHostsHybrid.Parity.Tests.ps1 asserts them).
+names:
+  rg_arc:            { type: rg,          purpose: avd-arc }
+  rg_control:        { type: rg,          purpose: avd }
+  rg_mon:            { type: rg,          purpose: avd-mon }
+  hostpool_hybrid:   { type: vdpool,      purpose: hybrid }
+  hostpool_identity: { type: id,          purpose: avd-hostpool }
+  dcr_avd_insights:  { type: dcr,         purpose: avd-insights }
+  arc_onboard_spn:   { type: spn,         purpose: arc-onboard }
+  kv_ops:            { type: kv,          purpose: ops }
+  fslogix_sa:        { type: st,          purpose: fslogix }
+  dcr_assoc:         { type: dcra,        purpose: avd-hybrid }
+  # AVD Hybrid session hosts: computer name = Hyper-V VM name = Arc machine name (naming standard §4)
+  sessionhost_hv01:  { type: sessionhost, purpose: hv, instance: 1 }
+  sessionhost_hv02:  { type: sessionhost, purpose: hv, instance: 2 }

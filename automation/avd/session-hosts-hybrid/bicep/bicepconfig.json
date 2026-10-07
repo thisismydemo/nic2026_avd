@@ -1,0 +1,19 @@
+{
+  "analyzers": {
+    "core": {
+      "enabled": true,
+      "rules": {
+        "no-unused-params": {
+          "level": "off",
+          "justification": "Script-only manifest inputs stay declared for one-to-one manifest parity."
+        },
+        "secure-secrets-in-params": {
+          "level": "error"
+        },
+        "use-recent-api-versions": {
+          "level": "warning"
+        }
+      }
+    }
+  }
+}

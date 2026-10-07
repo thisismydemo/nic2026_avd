@@ -1,0 +1,28 @@
+# avd-fslogix — FSLogix host configuration, share permissions and redirections (automation/CONTRACT.md §2, §10).
+# Implements design/avd/landing-zone.md §7 (AVD-LZ-10). Script-only: no IaC. Share paths and group object ids arrive as inputs.
+# Authored by gpt-6-sol via the HCS Foundry gateway; reviewed by non-Anthropic models (design/shared/verification-log.md).
+name: avd-fslogix
+description: "Configure FSLogix profile and ODFC containers, share permissions, Defender exclusions, and redirections for Azure Virtual Desktop session hosts."
+scope: avd
+tools: [powershell]
+depends_on: [lz-avd]
+
+inputs:
+  - { name: org, type: string, description: "Organization identifier.", required: true, source: environment }
+  - { name: lab_token, type: string, description: "Lab token.", required: true, source: environment, path: token }
+  - { name: fslogix_profile_unc, type: string, description: "Profile share UNC output of lz-avd.", required: true, source: environment }
+  - { name: fslogix_odfc_unc, type: string, description: "ODFC share UNC output of lz-avd.", required: true, source: environment }
+  - { name: fslogix_settings_file, type: string, description: "Path to the shared FSLogix settings JSON.", required: false, default: "fslogix-settings.json", source: environment }
+  - { name: redirections_xml, type: string, description: "Path to the redirections XML.", required: false, default: "redirections.xml", source: environment }
+  - { name: group_object_ids, type: map, description: "Map containing avd_users and avd_admins Entra group object IDs.", required: true, source: environment }
+  - { name: names, type: map, description: "Name catalog resolved from the names section below (contract §10).", required: false, default: {}, source: generated }
+
+outputs:
+  - { name: settings_applied, type: string, description: "Path of the JSON result for host settings." }
+  - { name: permissions_plan, type: string, description: "Path of the share permissions plan." }
+  - { name: redirections_published, type: string, description: "Path of the redirections publication result." }
+
+secrets: []
+destroy: none
+
+names: {}

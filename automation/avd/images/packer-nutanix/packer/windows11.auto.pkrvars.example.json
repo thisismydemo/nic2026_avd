@@ -1,0 +1,20 @@
+{
+  "customizer_directory": "../../shared/customizers",
+  "vm_name": "iic-avd-w11-ent",
+  "image_version": "0.0.1",
+  "build_username": "iic-build",
+  "nutanix_endpoint": "iic-prism.example.invalid",
+  "nutanix_username": "iic-packer",
+  "cluster_name": "iic-cluster",
+  "subnet_name": "iic-build-subnet",
+  "iso_image_name": "iic-windows11-enterprise-iso",
+  "virtio_iso_image_name": "iic-virtio-drivers-iso",
+  "image_name": "iic-avd-w11-ent-image",
+  "cpus": 4,
+  "memory_mb": 8192,
+  "disk_size_mb": 65536,
+  "winrm_timeout": "2h",
+  "arc_agent_uri": "https://aka.ms/AzureConnectedMachineAgent",
+  "arc_agent_directory": "C:\\IIC\\ArcAgent",
+  "shortpath_port": 3390
+}

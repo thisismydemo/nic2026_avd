@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "kerberos": {
+    "CloudKerberosTicketRetrievalEnabled": 1
+  },
+  "azuread": {
+    "LoadCredKeyFromProfile": 1
+  },
+  "profiles": {
+    "Enabled": 1,
+    "VHDLocations": "{{profile_share_unc}}",
+    "VolumeType": "VHDX",
+    "SizeInMBs": 30000,
+    "IsDynamic": 1,
+    "FlipFlopProfileDirectoryName": 1,
+    "DeleteLocalProfileWhenVHDShouldApply": 1,
+    "ProfileType": 0,
+    "RoamSearch": 0,
+    "RedirXMLSourceFolder": "{{profile_share_unc}}\\redirections"
+  },
+  "profiles_by_mode": {
+    "production": {
+      "PreventLoginWithFailure": 1,
+      "PreventLoginWithTempProfile": 1
+    },
+    "rehearsal": {
+      "PreventLoginWithFailure": 0,
+      "PreventLoginWithTempProfile": 0
+    }
+  },
+  "odfc": {
+    "Enabled": 1,
+    "VHDLocations": "{{odfc_share_unc}}",
+    "VolumeType": "VHDX",
+    "IncludeOfficeActivation": 1,
+    "IncludeOneDrive": 1,
+    "IncludeOutlook": 1,
+    "IncludeTeams": 1,
+    "VHDAccessMode": 0
+  },
+  "defender": {
+    "paths": [
+      "%ProgramFiles%\\FSLogix\\Apps\\frxdrv.sys",
+      "%ProgramFiles%\\FSLogix\\Apps\\frxccd.sys",
+      "%ProgramFiles%\\FSLogix\\Apps\\frxdrvvt.sys",
+      "%TEMP%\\*.VHD",
+      "%TEMP%\\*.VHDX",
+      "{{profile_share_unc}}\\*.VHDX",
+      "{{odfc_share_unc}}\\*.VHDX"
+    ],
+    "processes": [
+      "frxsvc.exe",
+      "frxccds.exe"
+    ]
+  }
+}

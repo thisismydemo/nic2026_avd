@@ -1,0 +1,8 @@
+# generated inputs and local state never leave the machine (contract §3)
+terraform.generated.tfvars.json
+*.tfstate
+*.tfstate.*
+*.tfplan
+.terraform/
+.terraform.lock.hcl
+crash.log

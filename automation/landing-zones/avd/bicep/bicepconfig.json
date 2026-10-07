@@ -1,0 +1,18 @@
+{
+  "analyzers": {
+    "core": {
+      "enabled": true,
+      "rules": {
+        "no-unused-params": {
+          "level": "off",
+          "_justification": "main.bicep declares every manifest input (contract §6 parity); inputs consumed only by scripts (tenant_id, key_vault_id, secret_name_prefix, demo_user_*) are intentionally unused in IaC."
+        },
+        "no-hardcoded-env-urls": { "level": "error" },
+        "secure-secrets-in-params": { "level": "error" },
+        "outputs-should-not-contain-secrets": { "level": "error" },
+        "use-recent-api-versions": { "level": "warning" }
+      }
+    }
+  },
+  "experimentalFeaturesEnabled": {}
+}

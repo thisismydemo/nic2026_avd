@@ -1,0 +1,29 @@
+name: avd-images-azure-local
+description: Import of the gallery image version into Azure Local as a marketplace-independent Azure Local VM image
+scope: avd
+tools: [powershell]
+depends_on: [avd-images-azure, lz-azure-local]
+
+inputs:
+  - { name: org, type: string, description: "Organization identifier.", required: true, source: environment }
+  - { name: lab_token, type: string, description: "Lab token.", required: true, source: environment, path: token }
+  - { name: location, type: string, description: "Azure region of the Azure Local image resource.", required: true, source: environment }
+  - { name: tenant_id, type: string, description: "Microsoft Entra tenant ID.", required: true, source: environment }
+  - { name: subscription_id_avd, type: string, description: "Subscription holding the gallery image version and the temporary disk.", required: true, source: environment }
+  - { name: subscription_id_azl, type: string, description: "Subscription holding the Azure Local image resource.", required: true, source: environment }
+  - { name: azl_image_name, type: string, description: "Azure Local image name (^img-[a-z0-9-]+$; must not contain 'windows').", required: true, source: environment, path: images.azure_local_image_name }
+  - { name: gallery_image_version_id, type: string, description: "Gallery image version produced by Start-ImageBuild (avd-images-azure).", required: true, source: generated }
+  - { name: custom_location_id, type: string, description: "Azure Local custom location resource ID.", required: true, source: generated }
+  - { name: storage_path_id, type: string, description: "Optional Azure Local storage path resource ID; empty lets the system choose.", required: false, default: "", source: environment }
+  - { name: image_resource_group, type: string, description: "Resource group of the Azure Local image resource.", required: true, source: generated }
+  - { name: temp_disk_resource_group, type: string, description: "Resource group for the temporary managed disk (AVD subscription).", required: true, source: generated }
+  - { name: sas_duration_seconds, type: int, description: "Lifetime of the read-only disk SAS in seconds.", required: false, default: 3600, source: environment }
+
+outputs:
+  - { name: azl_image_id, type: string, description: "Azure Local image resource ID." }
+
+secrets: []
+destroy: supported
+
+names:
+  disk_import: { type: disk, purpose: azl-import }

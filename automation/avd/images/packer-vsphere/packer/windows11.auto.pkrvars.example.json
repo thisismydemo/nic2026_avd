@@ -1,0 +1,21 @@
+{
+  "customizer_directory": "../../shared/customizers",
+  "vm_name": "iic-avd-w11-ent",
+  "image_version": "0.0.1",
+  "build_username": "iic-build",
+  "vcenter_server": "iic-vcenter.example.invalid",
+  "vcenter_username": "iic-packer",
+  "datacenter": "iic-datacenter",
+  "cluster": "iic-cluster",
+  "datastore": "iic-datastore",
+  "folder": "iic-templates",
+  "network": "iic-build-network",
+  "iso_datastore_path": "[iic-datastore] iso/iic-windows11-enterprise.iso",
+  "cpus": 4,
+  "memory_mb": 8192,
+  "disk_size_mb": 65536,
+  "winrm_timeout": "2h",
+  "arc_agent_uri": "https://aka.ms/AzureConnectedMachineAgent",
+  "arc_agent_directory": "C:\\IIC\\ArcAgent",
+  "shortpath_port": 3390
+}

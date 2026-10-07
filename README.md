@@ -1,134 +1,59 @@
 # AVD Anywhere: Azure Virtual Desktop on Azure, Azure Local, and AVD Hybrid Platforms
 
-## Session Overview
+This repository accompanies a session that shows one AVD workspace with three host pools, one for each realm: Azure for elasticity, Azure Local for data gravity, regulation and latency, and AVD Hybrid for Windows Server Hyper-V, VMware vSphere or Nutanix AHV without validated Azure Local hardware. The session uses one identity pattern, one FSLogix profile pattern and one operations story across the three realms. The demos route a user to the right host pool, move a profile between realms and recover from a forced session host failure.
 
-**Conference:** NIC 2026  
-**Date:** October 14, 2026  
-**Time:** 1:20 PM (W Europe Time)  
-**Duration:** 60 minutes  
-**Level:** 400 (Expert)  
-**Location:** Amsterdam
+## Session
 
-Azure Virtual Desktop is no longer a single-deployment story. This Level 400 session walks through all three deployment models and the engineering decisions that enable one identity, one profile pattern, and one operational story to span them all:
+| | |
+|---|---|
+| Conference | NIC 2026 |
+| Date and time | Wednesday 14 October 2026, 13:20 (W. Europe Time) |
+| Length | 60 minutes |
+| Level | 400 |
+| Speaker | Kristopher Turner |
 
-- **Azure** - For elasticity and scale
-- **Azure Local** - For data gravity, regulation, or latency
-- **AVD Hybrid** - Running on Windows Server Hyper-V, VMware vSphere, or Nutanix AHV (no validated Azure Local hardware required)
+## Start here
 
-## What You'll Learn
+1. Open the [follow-along site](https://thisismydemo.github.io/nic2026_avd/) (it goes live once GitHub Pages is switched on for this repository), or read the same content in [follow-along/README.md](follow-along/README.md).
+2. Read the handouts in [handouts/](handouts/).
+3. Read [automation/README.md](automation/README.md) for the run order, configuration and tests of the deployment automation.
 
-This session covers the complete architecture and operational patterns for running Azure Virtual Desktop across three distinct deployment models:
+## What is in this repository
 
-### AVD on Azure
-- Session host architecture and configuration
-- Azure Files integration with Entra ID Kerberos for FSLogix
-- Azure Compute Gallery with Image Builder for image management
-- AVD Insights and telemetry
-- Data collection rules for cost-conscious monitoring
+| Path | What it holds |
+|---|---|
+| `presentation/AVD_Anywhere_NIC2026.pptx` | The deck |
+| `handouts/` | `Identity_Reference_Architecture.md`, `Identity_Three_Paths.png`, `FSLogix_Configuration_Guide.md`, `Deployment_Checklist.md`, `Realm_Comparison.md`, `Q_A_Resources.md` |
+| `follow-along/README.md` | The attendee guide in Markdown |
+| `follow-along-site/` | Source of the follow-along site |
+| `automation/shared/` | The `NIC26.Automation` PowerShell module (config loader, naming, converters, Key Vault resolver), JSON Schemas and example environment files |
+| `automation/landing-zones/avd/` | Spoke network, private DNS resolver, FSLogix storage, monitoring configuration, Entra groups and SSO scripts |
+| `automation/avd/control-plane/` | Workspace, host pools, application groups and scaling plan |
+| `automation/avd/fslogix/` | Share permissions, host settings and `redirections.xml` |
+| `automation/avd/images/` | Azure Image Builder for Azure and Azure Local; Packer for Hyper-V (tested); Packer for vSphere and Nutanix AHV (reference templates, not run) |
+| `automation/avd/session-hosts-azure/`, `session-hosts-azure-local/`, `session-hosts-hybrid/` | Session hosts per realm; the hybrid realm builds Hyper-V VMs and installs the Arc agent and CloudDeviceExtension |
+| `automation/demo/` | The helpers the follow-along guide uses: state, routing, portability, failure and smoke test |
 
-### AVD on Azure Local
-- Session hosts as Azure Local VMs
-- Arc Resource Bridge and AKS dependencies
-- Azure Image Builder targeting Azure Local resources
-- FSLogix profile storage on cluster CSV vs. SMB scale-out file servers
-- GPU placement with DDA passthrough on cluster
+Bicep and Terraform are kept in parity; PowerShell orchestrates.
 
-### AVD Hybrid on Third-Party Platforms
-- AVD agent deployment on Hyper-V, vSphere, and Nutanix AHV
-- Image management without Azure Image Builder (using Packer and platform-native tooling)
-- FSLogix profile placement on platform-native storage (vSAN, Nutanix Files, SMB scale-out, third-party NAS)
-- Identity flow from on-prem session hosts back to Entra ID
-- Network connectivity from on-prem hosts to AVD control plane in Azure
-- GPU passthrough patterns specific to each hypervisor
-- Arc-enabling session hosts for monitoring and Azure Update Manager
+## What is tested and what is not
 
-### Cross-Cutting Patterns
-- One identity model spanning all three deployment types
-- FSLogix profile structures designed for portability across platforms
-- Image strategy: Azure Image Builder for Azure/Azure Local + Packer for AVD Hybrid, all driven from the same repository
-- Unified Azure Monitor and Log Analytics layer via Arc for session hosts everywhere
-
-## Live Demo
-
-Three host pools in a single AVD workspace covering all three deployment models:
-- User routed to appropriate host pool based on deployment model
-- Profile portability demonstration between deployment models
-- Forced session host failure with automatic recovery demonstration
-
-## Attendee Deliverables
-
-You'll leave with production-ready artifacts to take home:
-
-- ✅ **Azure Image Builder templates** - Ready-to-use for Azure and Azure Local deployments
-- ✅ **Packer templates** - For Hyper-V, VMware vSphere, and Nutanix AHV
-- ✅ **Bicep infrastructure code** - Complete workspace and host pool deployment
-- ✅ **FSLogix configuration profiles** - Portable across all deployment models
-- ✅ **Arc onboarding scripts** - PowerShell automation for AVD Hybrid session hosts
-- ✅ **Identity reference architecture diagram** - Design patterns for multi-model deployment
-- ✅ **Complete GitHub repository** - Full deployment code, documentation, and scripts
-
-## Repository Contents
-
-### `/PRESENTATION`
-- NIC 2026 PowerPoint presentation (using official NIC template)
-- Speaker notes and slide references
-
-### `/HANDOUTS`
-- **Identity_Reference_Architecture.md** - Detailed identity design patterns for all three models
-- **FSLogix_Configuration_Guide.md** - Comprehensive FSLogix setup and best practices
-- **Deployment_Checklist.md** - Step-by-step deployment validation checklist
-- **Q&A_Resources.md** - Common questions and detailed answers with links to documentation
-
-### `/src/bicep`
-- `avd-azure.bicep` - Azure deployment template
-- `avd-azurelocal.bicep` - Azure Local deployment template
-- `workspace.bicep` - Workspace with multiple host pools
-
-### `/src/packer`
-- `avd-hyperv.pkr.hcl` - Packer configuration for Hyper-V
-- `avd-vsphere.pkr.hcl` - Packer configuration for VMware vSphere
-- `avd-nutanix.pkr.hcl` - Packer configuration for Nutanix AHV
-
-### `/src/arm-templates/image-builder`
-- Azure Image Builder configuration for Azure and Azure Local
-
-### `/src/scripts`
-- **arc-onboarding/** - Enable-ArcVM.ps1 for hybrid session hosts
-- **fslogix/** - Configuration scripts and FSLogix profiles XML
-
-### `/src/monitoring`
-- `dcr-avd.json` - Azure Monitor Data Collection Rules for cost-conscious logging
-
-## Getting Started
-
-1. **Review the Identity Reference Architecture** - Start with `HANDOUTS/Identity_Reference_Architecture.md`
-2. **Choose your deployment model** - Pick the Bicep or Packer templates that match your environment
-3. **Follow the Deployment Checklist** - Use `HANDOUTS/Deployment_Checklist.md` for step-by-step validation
-4. **Customize for your environment** - Update Bicep parameters and configuration files for your specific needs
-5. **Review Q&A Resources** - Check `HANDOUTS/Q&A_Resources.md` for answers to common deployment questions
+The code is tested with Pester (using mocks), by compiling the Bicep and by validating the Terraform. It has not yet been run end to end against a tenant from this repository: treat the first deployment as a test and use a non-production subscription. The vSphere and Nutanix Packer templates are references that have not been run. Everything is variable-driven, and the example files hold neutral placeholder values that you replace with your own.
 
 ## Prerequisites
 
-- Basic understanding of Azure Virtual Desktop concepts
-- Familiarity with Bicep (for Azure deployments) or Packer (for hybrid)
-- Access to Azure or appropriate hybrid platform
-- PowerShell 7+ for scripting
+- PowerShell 7.4 or later, Az PowerShell, Azure CLI with Bicep, Terraform 1.9 or later, Pester 5.5 or later
+- An Azure subscription
+- For the Hybrid realm, a Windows Server Hyper-V host
 
-## Support & Questions
+## Security
 
-For questions about the content:
-- Check the Q&A Resources in HANDOUTS
-- Review the Deployment Checklist for common issues
-- Refer to official Microsoft documentation links in the handouts
+Secrets never go in files; use Key Vault references only. Report a suspected vulnerability or leaked secret privately through the repository's Security tab (see [SECURITY.md](SECURITY.md)), and never in a public issue.
 
 ## License
 
-These materials are provided as-is for educational purposes.
+MIT. See [LICENSE](LICENSE).
 
-## Speaker
+## Feedback
 
-Presented at NIC 2026
-
----
-
-**Questions? Issues? Feedback?** Open an issue in this repository.
+Open an issue for content questions.

@@ -1,0 +1,19 @@
+{
+  "analyzers": {
+    "core": {
+      "enabled": true,
+      "rules": {
+        "no-unused-params": {
+          "level": "off",
+          "justification": "Manifest parity requires inputs that only the naming and wrapper tooling consume."
+        },
+        "secure-secrets-in-params": {
+          "level": "error"
+        },
+        "use-recent-api-versions": {
+          "level": "warning"
+        }
+      }
+    }
+  }
+}

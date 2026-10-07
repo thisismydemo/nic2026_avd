@@ -1,0 +1,19 @@
+{
+  "analyzers": {
+    "core": {
+      "enabled": true,
+      "rules": {
+        "no-unused-params": {
+          "level": "off",
+          "justification": "Manifest parity requires inputs consumed by the post-deployment registration workflow."
+        },
+        "secure-secrets-in-params": {
+          "level": "error"
+        },
+        "use-recent-api-versions": {
+          "level": "warning"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,29 @@
+name: avd-images-packer-hyperv
+description: Packer Hyper-V build of the Windows 11 multi-session image for the Hybrid realm
+scope: avd
+tools: [packer, powershell]
+depends_on: [lz-azure-local]
+
+inputs:
+  - { name: org, type: string, description: "Organization identifier.", required: true, source: environment }
+  - { name: lab_token, type: string, description: "Lab token.", required: true, source: environment, path: token }
+  - { name: hybrid_csv_path, type: string, description: "Azure Local cluster shared volume root.", required: true, source: environment, path: hybrid.csv_path }
+  - { name: compute_switch_name, type: string, description: "Hyper-V compute switch of the build VM.", required: true, source: environment, path: hybrid.compute_switch_name }
+  - { name: hybrid_vlan_id, type: int, description: "VLAN of the build VM.", required: true, source: environment, path: hybrid.vlan_id }
+  - { name: packer_iso_path, type: string, description: "Windows 11 Enterprise volume-license ISO.", required: true, source: environment, path: images.packer_iso_path }
+  - { name: packer_iso_checksum, type: string, description: "SHA-256 of the ISO (sha256:<hex>).", required: true, source: environment, path: images.packer_iso_checksum }
+  - { name: packer_output_path, type: string, description: "Packer output directory.", required: true, source: environment, path: images.packer_output_path }
+  - { name: hybrid_image_vhdx, type: string, description: "Intended generalized image path (relative to hybrid_csv_path).", required: true, source: environment, path: images.hybrid_image_vhdx }
+  - { name: shortpath_managed_port, type: int, description: "RDP Shortpath managed-networks UDP port.", required: true, source: environment }
+  - { name: build_admin_username_secret, type: secret-ref, description: "keyvault:// reference of the build administrator user name (logical secret avd-image-build-admin).", required: true, source: keyvault }
+  - { name: build_admin_password_secret, type: secret-ref, description: "keyvault:// reference of the build administrator password (logical secret avd-image-build-admin); resolved in memory by scripts/Invoke-PackerBuild.ps1.", required: true, source: keyvault }
+
+outputs:
+  - { name: hybrid_image_vhdx_path, type: string, description: "Path of the built, generalized VHDX." }
+  - { name: image_manifest_path, type: string, description: "Path of the build manifest (VHDX path, SHA-256, build id, Packer version)." }
+
+secrets: [avd-image-build-admin]
+destroy: supported
+
+names:
+  build_vm: { type: vm, purpose: img-build }

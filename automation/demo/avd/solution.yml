@@ -1,0 +1,44 @@
+# NIC 2026 — demo support, AVD Anywhere session (demo-avd)
+# Manifest per automation/CONTRACT.md §2, §10, §12. PowerShell only; runs from the Windows jump server (Az, Microsoft
+# Graph, PowerShell remoting to the cluster nodes for the Hybrid realm). Supports planning/sessions/avd/outline.md §0, §8.
+
+name: demo-avd
+description: "Demo helpers for the AVD Anywhere session: realm routing switch (reversible), profile-portability evidence, forced session-host failure with undo, state dashboard, smoke test."
+scope: avd
+tools: [powershell]
+depends_on: [lz-avd, avd-control-plane, avd-session-hosts-azure, avd-session-hosts-azure-local, avd-session-hosts-hybrid, demo-shared]
+
+inputs:
+  - { name: entra_groups,               type: map,    description: "Realm groups (avd_azure, avd_azl, avd_hybrid) moved by Switch-UserHostPool.ps1", required: true, default: null, source: environment }
+  - { name: demo_users,                 type: list,   description: "Demo users (upn, realm) checked by the smoke test", required: true, default: null, source: environment }
+  - { name: host_pools,                 type: map,    description: "Per-realm friendly names shown by Show-AvdState.ps1", required: true, default: null, source: environment }
+  - { name: share_names,                type: map,    description: "FSLogix profiles/odfc share names listed (metadata only) by Test-ProfilePortability.ps1", required: true, default: null, source: environment }
+  - { name: hybrid,                     type: map,    description: "hybrid.vms[] (name, owner_node) for the Hyper-V host failure beat", required: true, default: null, source: environment }
+  - { name: log_analytics_workspace_id, type: string, description: "Workspace queried for AVD Insights connections and heartbeats", required: true, default: null, source: environment }
+  - { name: tenant_domain,              type: string, description: "Masked by the screen-hygiene filter", required: true, default: null, source: environment }
+  - { name: demo_user_domain,           type: string, description: "Masked by the screen-hygiene filter", required: true, default: null, source: environment }
+  - { name: subscriptions,              type: map,    description: "Masked by the screen-hygiene filter", required: true, default: null, source: environment }
+  - { name: org,                        type: string, description: "Naming segment <org>", required: true, default: null, source: environment }
+  - { name: token,                      type: string, description: "Naming segment <token>", required: true, default: null, source: environment }
+  - { name: location_short,             type: string, description: "Naming segment <region>", required: true, default: null, source: environment }
+
+outputs:
+  - { name: active_fault, type: string, description: "SessionHost fault lock currently recorded (host name) or none." }
+
+secrets: []          # the AVD demo scripts read no secret; registration tokens are never stored (HYB-07)
+
+destroy: none
+
+names:
+  rg_control:      { type: rg,     purpose: avd }             # control plane (workspace, host pools, app groups)
+  rg_hosts:        { type: rg,     purpose: avd-hosts }       # Azure-realm session host VMs
+  rg_azl_hosts:    { type: rg,     purpose: azl }             # Azure Local-realm VMs: the cluster resource group, owned by lz-azure-local (conflict A8)
+  rg_arc:          { type: rg,     purpose: avd-arc }         # Hybrid-realm Arc machines (HYB-02)
+  vdws:            { type: vdws }
+  vdpool_azure:    { type: vdpool, purpose: azure }
+  vdpool_azl:      { type: vdpool, purpose: azl }
+  vdpool_hybrid:   { type: vdpool, purpose: hybrid }
+  vdag_azure:      { type: vdag,   purpose: azure }
+  vdag_azl:        { type: vdag,   purpose: azl }
+  vdag_hybrid:     { type: vdag,   purpose: hybrid }
+  st_fslogix:      { type: st,     purpose: fslogix }
