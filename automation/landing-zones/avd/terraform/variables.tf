@@ -83,9 +83,17 @@ variable "onprem_compute_prefixes" {
 
 variable "bastion_subnet_prefix" {
   type        = string
-  description = "Existing AzureBastionSubnet prefix (admin RDP source; the jump server is covered by azl_spoke_prefix)."
+  description = "Existing AzureBastionSubnet prefix (Bastion admin RDP source; jump traffic has a separate host prefix)."
 }
 
+variable "jump_admin_source_prefix" {
+  type        = string
+  description = "Dedicated jump workspace private IPv4 /32; routing is validated separately."
+  validation {
+    condition     = can(cidrnetmask(var.jump_admin_source_prefix)) && endswith(var.jump_admin_source_prefix, "/32")
+    error_message = "jump_admin_source_prefix must be one IPv4 /32 host prefix."
+  }
+}
 variable "azl_spoke_vnet_id" {
   type        = string
   description = "Azure Local spoke VNet id (lz-azure-local output)."

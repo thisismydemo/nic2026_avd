@@ -59,8 +59,11 @@ param p2s_pool string
 @description('On-prem session-host prefixes allowed to the private endpoint (P-08 VLAN and the Azure Local AVD lnet).')
 param onprem_compute_prefixes array
 
-@description('Existing AzureBastionSubnet prefix (admin RDP source; the jump server is covered by azl_spoke_prefix).')
+@description('Existing AzureBastionSubnet prefix (Bastion admin RDP source; jump traffic has a separate host prefix).')
 param bastion_subnet_prefix string
+
+@description('Dedicated jump workspace private IPv4 /32; routing is validated separately.')
+param jump_admin_source_prefix string
 
 @description('Azure Local spoke VNet id (lz-azure-local output).')
 param azl_spoke_vnet_id string
@@ -187,7 +190,7 @@ module network 'modules/network.bicep' = {
     avd_subnets: avd_subnets
     p2s_pool: p2s_pool
     onprem_compute_prefixes: onprem_compute_prefixes
-    admin_source_prefixes: [bastion_subnet_prefix, azl_spoke_prefix]
+    admin_source_prefixes: [bastion_subnet_prefix, jump_admin_source_prefix]
     azl_spoke_prefix: azl_spoke_prefix
     log_analytics_workspace_id: log_analytics_workspace_id
     enable_dns_private_resolver: enable_private_endpoints && enable_dns_private_resolver

@@ -86,7 +86,7 @@ module "nsg_hosts" {
       direction                  = "Inbound"
       access                     = "Allow"
       protocol                   = "Tcp"
-      source_address_prefixes    = [var.bastion_subnet_prefix, var.azl_spoke_prefix]
+      source_address_prefixes    = [var.bastion_subnet_prefix, var.jump_admin_source_prefix]
       source_port_range          = "*"
       destination_address_prefix = var.avd_subnets.hosts
       destination_port_range     = "3389"

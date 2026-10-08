@@ -27,12 +27,13 @@ inputs:
   - { name: hub_address_space,        type: string, description: "Hub address space (reference for NSG sanity checks).", required: true, source: environment }
   - { name: identity_spoke_vnet_id,   type: string, description: "Existing identity spoke VNet id; receives a link to the lab's privatelink.file zone (P-11).", required: true, source: environment }
   - { name: p2s_pool,                 type: string, description: "Point-to-site client pool (presenter path, D-018) for the Shortpath NSG rule; shared schema key `p2s_client_pool`.", required: true, source: environment, path: p2s_client_pool }
-  - { name: bastion_subnet_prefix,    type: string, description: "Existing AzureBastionSubnet prefix; admin RDP source for the hosts NSG (design §4.6). The lab jump server is covered by azl_spoke_prefix.", required: true, source: environment }
+  - { name: bastion_subnet_prefix,    type: string, description: "Existing AzureBastionSubnet prefix; admin RDP source for the hosts NSG (design §4.6). Jump admin traffic uses jump_admin_source_prefix.", required: true, source: environment }
+  - { name: jump_admin_source_prefix, type: string, description: "Dedicated jump workspace private IPv4 /32 for admin RDP; refresh if the dynamic address changes. Routing remains a separate prerequisite.", required: true, source: environment }
   - { name: onprem_compute_prefixes,  type: list,   description: "On-prem session-host ranges (AVD-hosts VLAN per P-08 plus the Azure Local AVD lnet range) allowed to the private endpoint.", required: true, source: environment }
 
   # --- Azure Local landing-zone outputs consumed here ---
   - { name: azl_spoke_vnet_id,        type: string, description: "Azure Local spoke VNet id (lz-azure-local output) for the direct spoke-to-spoke peering and the zone link.", required: true, source: environment }
-  - { name: azl_spoke_prefix,         type: string, description: "Azure Local spoke prefix (NSG rules; also the admin source for the jump server).", required: true, source: environment }
+  - { name: azl_spoke_prefix,         type: string, description: "Azure Local workload spoke prefix (SMB and workload rules).", required: true, source: environment }
   - { name: log_analytics_workspace_id, type: string, description: "Supplied central monitoring workspace; destination for the AVD DCR, diagnostics and alerts (AVD-LZ-12).", required: true, source: environment }
   - { name: key_vault_id,             type: string, description: "Operations vault id (lz-azure-local output). Consumed by scripts only; IaC never reads secrets (AVD-LZ-13).", required: true, source: environment }
   - { name: action_group_id,          type: string, description: "Ops action group id (lz-azure-local output) for budget and alert notifications.", required: true, source: environment }

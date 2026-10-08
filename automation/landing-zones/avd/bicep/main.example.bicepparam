@@ -76,6 +76,7 @@ param identity_spoke_vnet_id = '/subscriptions/00000000-0000-0000-0000-000000000
 param p2s_pool = '172.30.100.0/24'
 param onprem_compute_prefixes = ['192.168.120.0/24']
 param bastion_subnet_prefix = '10.100.0.64/26'
+param jump_admin_source_prefix = '192.0.2.10/32'
 param azl_spoke_vnet_id = '/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-iic-nic26-azl-net-eus-01/providers/Microsoft.Network/virtualNetworks/vnet-iic-nic26-azl-eus-01'
 param azl_spoke_prefix = '10.100.6.0/24'
 param log_analytics_workspace_id = '/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-iic-nic26-azl-mon-eus-01/providers/Microsoft.OperationalInsights/workspaces/law-iic-nic26-eus-01'
