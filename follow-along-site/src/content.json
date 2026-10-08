@@ -401,7 +401,7 @@
           "None."
         ],
         "repoPaths": [
-          "automation/landing-zones/avd (monitoring modules)"
+          "automation/landing-zones/avd"
         ]
       }
     },
