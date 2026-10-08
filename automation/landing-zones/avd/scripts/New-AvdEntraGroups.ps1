@@ -13,6 +13,14 @@
     <SecretNamePrefix>-arc-onboarding-spn-client-id / -secret (90-day expiry, five tags) and never printed. That part
     must run on the Windows jump server. The Azure RBAC for the principal is done by lz-avd IaC (arc_onboard_sp_object_id).
     Object ids (names and ids only, no secrets) are written to -OutputFile for the environment file.
+.PARAMETER GraphAccessToken
+    Optional operator Graph JWT as a SecureString. Its tenant must match TenantId. Without it, interactive Graph
+    sign-in is unchanged. The caller owns and disposes this token; it is never logged or persisted.
+.NOTES
+    Author: Kristopher Turner
+    Contact: kris@hybridsolutions.cloud
+    Version: 1.1.0
+    TaskReference: T-3.2.2
 .EXAMPLE
     ..New-AvdEntraGroups.ps1 -TenantId <id> -Org <org> -LabToken <lab>
 .EXAMPLE
@@ -31,6 +39,7 @@ param(
     [string]$OwnerEmail,
     [int]$SecretExpiryDays = 90,
     [string]$OutputFile,
+    [securestring]$GraphAccessToken,
     [switch]$Execute
 )
 Set-StrictMode -Version Latest
@@ -57,7 +66,50 @@ foreach ($cmd in 'Connect-MgGraph', 'Get-MgGroup', 'New-MgGroup', 'New-MgGroupMe
 
 $scopes = @('Group.ReadWrite.All', 'GroupMember.ReadWrite.All')
 if ($IncludeArcOnboardingPrincipal) { $scopes += 'Application.ReadWrite.All' }
-Connect-MgGraph -TenantId $TenantId -Scopes $scopes -NoWelcome
+
+function Assert-LzAvdGraphTokenTenant {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][securestring]$Token, [Parameter(Mandatory)][string]$TenantId)
+    $bstr = [IntPtr]::Zero
+    $plain = $null; $parts = $null; $payloadBase64 = $null
+    $payloadBytes = $null; $payloadText = $null; $claims = $null
+    try {
+        $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Token)
+        $plain = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
+        if ($plain -notmatch '\A[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\z') {
+            throw 'Invalid Graph access token or tenant mismatch.'
+        }
+        $parts = $plain.Split('.')
+        $payloadBase64 = $parts[1].Replace('-', '+').Replace('_', '/')
+        switch ($payloadBase64.Length % 4) {
+            2 { $payloadBase64 += '==' }
+            3 { $payloadBase64 += '=' }
+            1 { throw 'Invalid Graph access token or tenant mismatch.' }
+        }
+        $payloadBytes = [Convert]::FromBase64String($payloadBase64)
+        $payloadText = [Text.UTF8Encoding]::new($false, $true).GetString($payloadBytes)
+        $claims = ConvertFrom-Json -InputObject $payloadText -AsHashtable -ErrorAction Stop
+        if ($claims -isnot [Collections.IDictionary] -or -not $claims.Contains('tid') -or
+            $claims['tid'] -isnot [string] -or
+            -not [string]::Equals($claims['tid'], $TenantId, [StringComparison]::OrdinalIgnoreCase)) {
+            throw 'Invalid Graph access token or tenant mismatch.'
+        }
+    }
+    catch { throw 'Invalid Graph access token or tenant mismatch.' }
+    finally {
+        if ($null -ne $payloadBytes) { [Array]::Clear($payloadBytes, 0, $payloadBytes.Length) }
+        if ($bstr -ne [IntPtr]::Zero) { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
+        $claims = $null; $payloadText = $null; $payloadBase64 = $null; $parts = $null; $plain = $null
+    }
+}
+
+if ($null -eq $GraphAccessToken) {
+    Connect-MgGraph -TenantId $TenantId -Scopes $scopes -NoWelcome
+}
+else {
+    Assert-LzAvdGraphTokenTenant -Token $GraphAccessToken -TenantId $TenantId
+    Connect-MgGraph -AccessToken $GraphAccessToken -NoWelcome
+}
 
 function Get-LzAvdGroupByName {
     param([Parameter(Mandatory)][string]$DisplayName)
