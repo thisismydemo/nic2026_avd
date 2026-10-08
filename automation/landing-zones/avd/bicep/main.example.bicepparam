@@ -127,6 +127,7 @@ param image_definitions = [
 ]
 param avd_budget_monthly = 1500
 param enable_policy_assignments = true
+param deploy_platform_scope_items = false
 param group_object_ids = {
   avd_users: '00000000-0000-0000-0000-000000000000'
   avd_admins: '00000000-0000-0000-0000-000000000000'

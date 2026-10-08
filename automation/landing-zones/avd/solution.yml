@@ -33,7 +33,7 @@ inputs:
   # --- Azure Local landing-zone outputs consumed here ---
   - { name: azl_spoke_vnet_id,        type: string, description: "Azure Local spoke VNet id (lz-azure-local output) for the direct spoke-to-spoke peering and the zone link.", required: true, source: environment }
   - { name: azl_spoke_prefix,         type: string, description: "Azure Local spoke prefix (NSG rules; also the admin source for the jump server).", required: true, source: environment }
-  - { name: log_analytics_workspace_id, type: string, description: "Lab workspace law-* (lz-azure-local output); destination for the AVD DCR, diagnostics and alerts (AVD-LZ-12).", required: true, source: environment }
+  - { name: log_analytics_workspace_id, type: string, description: "Supplied central monitoring workspace; destination for the AVD DCR, diagnostics and alerts (AVD-LZ-12).", required: true, source: environment }
   - { name: key_vault_id,             type: string, description: "Operations vault id (lz-azure-local output). Consumed by scripts only; IaC never reads secrets (AVD-LZ-13).", required: true, source: environment }
   - { name: action_group_id,          type: string, description: "Ops action group id (lz-azure-local output) for budget and alert notifications.", required: true, source: environment }
 
@@ -56,7 +56,8 @@ inputs:
   - { name: image_definitions,        type: list,   description: "Gallery image definitions (name, publisher, offer, sku, os_type, hyper_v_generation, security_type, os_state); schema path images.image_definitions.", required: true, source: environment, path: images.image_definitions }
 
   # --- governance (design §2) ---
-  - { name: avd_budget_monthly,       type: int,    description: "Monthly budget amount (design §2.3).", required: true, source: environment }
+  - { name: avd_budget_monthly,       type: int,    description: "Monthly workload budget amount; zero skips delivery while placement or access is unresolved (design §2.3).", required: true, source: environment }
+  - { name: deploy_platform_scope_items, type: bool, description: "Platform-owned hub peering and policy assignments; false relies on existing platform delivery. Enable only with explicit ownership approval.", required: false, default: false, source: environment }
   - { name: enable_policy_assignments, type: bool,  description: "Assign the built-in Deny/Audit/Modify policies of design §2.4 at subscription scope. ADDED flag; not yet in the schema (DINE policies are a documented gap).", required: false, default: true, source: environment }
 
   # --- identity principals (design §5; object ids written by the Graph scripts) ---

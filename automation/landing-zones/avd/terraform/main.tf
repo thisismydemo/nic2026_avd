@@ -399,6 +399,7 @@ module "spoke_vnet" {
 # 2a. Peerings — azapi so both the hub side (connectivity subscription) and the Azure Local side are created by one
 # provider; hub side first (gateway transit must exist before useRemoteGateways is accepted).
 resource "azapi_resource" "peer_hub_to_spoke" {
+  count     = var.deploy_platform_scope_items ? 1 : 0
   type      = "Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2024-05-01"
   name      = var.names["peer_hub_to_spoke"]
   parent_id = var.hub_vnet_id
@@ -868,6 +869,7 @@ resource "azurerm_monitor_scheduled_query_rules_alert_v2" "avd" {
 # 8. Governance — budget (azurerm; no AVM Terraform budget module), policy (azurerm; definitions looked up by display name)
 # ---------------------------------------------------------------------------------------------------------------------
 resource "azurerm_consumption_budget_subscription" "avd" {
+  count           = var.avd_budget_monthly > 0 ? 1 : 0
   name            = var.names["budget"]
   subscription_id = local.subscription_scope
   amount          = var.avd_budget_monthly
@@ -912,12 +914,12 @@ locals {
 }
 
 data "azurerm_policy_definition" "builtin" {
-  for_each     = var.enable_policy_assignments ? local.policy_display_names : {}
+  for_each     = (var.deploy_platform_scope_items && var.enable_policy_assignments) ? local.policy_display_names : {}
   display_name = each.value
 }
 
 resource "azurerm_subscription_policy_assignment" "allowed_locations" {
-  count = var.enable_policy_assignments ? 1 : 0
+  count = (var.deploy_platform_scope_items && var.enable_policy_assignments) ? 1 : 0
 
   name                 = var.names["asg_allowed_locations"]
   display_name         = "AVD lab: allowed locations"
@@ -930,7 +932,7 @@ resource "azurerm_subscription_policy_assignment" "allowed_locations" {
 }
 
 resource "azurerm_subscription_policy_assignment" "require_tags" {
-  for_each = var.enable_policy_assignments ? toset(local.governed_tags) : toset([])
+  for_each = (var.deploy_platform_scope_items && var.enable_policy_assignments) ? toset(local.governed_tags) : toset([])
 
   name                 = "${var.names["asg_require_tags"]}-${each.key}"
   display_name         = "AVD lab: require tag ${each.key} on resource groups"
@@ -941,7 +943,7 @@ resource "azurerm_subscription_policy_assignment" "require_tags" {
 }
 
 resource "azurerm_subscription_policy_assignment" "inherit_tags" {
-  for_each = var.enable_policy_assignments ? toset(local.governed_tags) : toset([])
+  for_each = (var.deploy_platform_scope_items && var.enable_policy_assignments) ? toset(local.governed_tags) : toset([])
 
   name                 = "${var.names["asg_inherit_tags"]}-${each.key}"
   display_name         = "AVD lab: inherit tag ${each.key} from the resource group"
@@ -957,7 +959,7 @@ resource "azurerm_subscription_policy_assignment" "inherit_tags" {
 }
 
 resource "azurerm_role_assignment" "inherit_tags_identity" {
-  for_each = var.enable_policy_assignments ? toset(local.governed_tags) : toset([])
+  for_each = (var.deploy_platform_scope_items && var.enable_policy_assignments) ? toset(local.governed_tags) : toset([])
 
   scope                = local.subscription_scope
   role_definition_name = "Tag Contributor"
@@ -966,7 +968,7 @@ resource "azurerm_role_assignment" "inherit_tags_identity" {
 }
 
 resource "azurerm_subscription_policy_assignment" "storage_hygiene" {
-  for_each = var.enable_policy_assignments ? { "1" = "storage_public_access", "2" = "storage_secure_transfer" } : {}
+  for_each = (var.deploy_platform_scope_items && var.enable_policy_assignments) ? { "1" = "storage_public_access", "2" = "storage_secure_transfer" } : {}
 
   name                 = "${var.names["asg_storage_hygiene"]}-${each.key}"
   display_name         = "AVD lab: storage hygiene (${each.key})"
@@ -977,7 +979,7 @@ resource "azurerm_subscription_policy_assignment" "storage_hygiene" {
 }
 
 resource "azurerm_resource_group_policy_assignment" "hosts_no_public_ip" {
-  count = var.enable_policy_assignments ? 1 : 0
+  count = (var.deploy_platform_scope_items && var.enable_policy_assignments) ? 1 : 0
 
   name                 = var.names["asg_no_public_ip"]
   display_name         = "AVD lab: no public IPs on session hosts"

@@ -2,17 +2,25 @@
 
 Implements design/avd/landing-zone.md (AVD-LZ-01..14) under the rules of automation/CONTRACT.md. It is the foundation the AVD solutions (`avd-control-plane`, `avd-fslogix`, `avd-images`, `session-hosts-*`) build on. Nothing here deploys by itself: every script is `-WhatIf` by default and changes Azure only with `-Execute`.
 
+## Ownership before deployment
+
+The workload-only default is `deploy_platform_scope_items=false`. The template does not write the platform-owned hub reverse peering or policy assignments in this mode. The platform must supply an existing hub-to-AVD peering with gateway transit before the spoke enables remote gateways. The Azure Local reverse peering is workload-owned and remains in this deployment. D-040 approves only the three Azure Local platform reverse peerings; it does not approve an AVD hub reverse peering.
+
+Use the centrally delivered monitoring workspace for `log_analytics_workspace_id`. A budget amount of zero skips the workload budget while its placement or access remains unresolved; positive amounts retain the existing budget behavior. These omissions do not prove that platform controls or connectivity are present: read and verify them separately.
+
+For Terraform state that already manages a platform resource, changing the flag to false can plan its destruction. Review ownership and transfer state before applying; never use the flag to delete platform resources. Bicep incremental mode retains resources omitted by a false condition.
+
 ## What it deploys
 
 | Area | Resources | Design |
 |---|---|---|
 | Governance | 7 resource groups by lifecycle (`control`, `net`, `hosts`, `img`, `stor`, `mon`, `arc`), tags, subscription budget (50/80/100 % actual + 100 % forecast), built-in policy assignments (allowed locations, require/inherit 5 tags, storage hygiene audit, no public IPs on the hosts RG) | §2, §3 |
-| Network | Spoke VNet (`avd_vnet_prefix`) with `hosts`, `pe`, `imgbuild` (private-link policies off), `dnsin` (delegated) subnets; three NSGs per §4.6; peerings hub↔spoke (hub side cross-subscription, gateway transit) and spoke↔Azure Local spoke (both sides); DNS Private Resolver inbound endpoint only with `enable_private_endpoints` and `enable_dns_private_resolver` (D-029: off by default) | §4 |
+| Network | Spoke VNet (`avd_vnet_prefix`) with `hosts`, `pe`, `imgbuild` (private-link policies off), `dnsin` (delegated) subnets; three NSGs per §4.6; peerings hub↔spoke (hub reverse side only with platform-scope approval, gateway transit) and spoke↔Azure Local spoke (both sides); DNS Private Resolver inbound endpoint only with `enable_private_endpoints` and `enable_dns_private_resolver` (D-029: off by default) | §4 |
 | Private DNS | **Off by default (D-029).** With `enable_private_endpoints=true`: own `privatelink.file.core.windows.net` zone (P-11) linked to the AVD spoke, the Azure Local spoke and the identity VNet; hub link behind `link_privatelink_zone_to_hub` | §4.5 |
 | Profiles | Premium FileStorage account: public endpoint by default (D-029; disabled with `enable_private_endpoints`), shared keys only for backup, TLS 1.2, SMB 3.1.1 / Kerberos / AES-256, `directoryServiceOptions = AADKERB`, `defaultSharePermission = None`; two shares with share-level RBAC; private endpoint with DNS zone group only with `enable_private_endpoints`; Recovery Services vault + Azure Files snapshot policy + protected items behind `enable_backup` | §7 |
 | Images | Compute Gallery with the definitions listed in `images.image_definitions`; Image Builder identity + two custom roles | §8.1 |
 | Identity / RBAC | Host-pool UAMI (Reader on the Arc RG), users/admins VM login roles on the hosts and Arc RGs, Desktop Virtualization Contributor/Reader, share roles, Arc onboarding role for the SPN (when `arc_onboard_sp_object_id` is set) | §5.3, hybrid §3 |
-| Monitoring | AVD Insights DCR (default counters/events, Windows kind) to the lab workspace; three scheduled-query alerts to the ops action group; diagnostic settings on VNet, NSGs, storage, vault | §9 |
+| Monitoring | AVD Insights DCR (default counters/events, Windows kind) to the supplied central workspace; three scheduled-query alerts to the ops action group; diagnostic settings on VNet, NSGs, storage, vault | §9 |
 
 Not in this solution (owned elsewhere): AVD workspace/host pools/app groups/scaling plan (`avd-control-plane`), AIB templates and Packer (`avd-images`), session hosts, the Azure Local VM RG cross-subscription Reader (lz-azure-local, needs `hostpool_identity_principal_id`), the ops vault / workspace / action group / jump server (lz-azure-local).
 
@@ -20,7 +28,7 @@ Not in this solution (owned elsewhere): AVD workspace/host pools/app groups/scal
 
 The single source is [`solution.yml`](solution.yml): every input (canonical names from the design variables table, `path:` where the environment schema key differs, e.g. `lab_token -> token`, `p2s_pool -> p2s_client_pool`, `image_definitions -> images.image_definitions`) and every output. Bicep parameters, Terraform variables and outputs mirror it one-to-one (`tests/LzAvd.Parity.Tests.ps1`). Names come only from the `names:` catalog (contract §10) and reach IaC as the `names` object.
 
-Inputs added beyond the design table (reported to the owner): `bastion_subnet_prefix` (admin RDP source; design named it without a variable), `owner_email`, `enable_dns_private_resolver`, `enable_backup`, `enable_policy_assignments`, `link_privatelink_zone_to_hub`, `arc_onboard_sp_object_id`. The last five are **not yet in `automation/shared/schemas/avd.environment.schema.json`** (unknown keys are rejected there); they carry safe defaults so the converter works today, and need a schema entry before an operator can flip them in `environment/avd/*.yml`.
+Inputs added beyond the design table (reported to the owner): `bastion_subnet_prefix` (admin RDP source; design named it without a variable), `owner_email`, `enable_dns_private_resolver`, `enable_backup`, `enable_policy_assignments`, `link_privatelink_zone_to_hub`, `arc_onboard_sp_object_id`. These flags are supported by `automation/shared/schemas/avd.environment.schema.json`. The additional `deploy_platform_scope_items` flag defaults to false and gates platform-owned delivery.
 
 Outputs consumed downstream: resource group names, subnet ids, `dns_resolver_inbound_ip` (Azure Local lnet DNS and the Hyper-V DHCP reservations), `privatelink_file_zone_id`, storage account id/name and both UNC paths, `gallery_id` + `image_definition_ids`, host-pool identity ids, `aib_identity_*`, `dcr_avd_insights_id`, `recovery_vault_id`.
 
@@ -53,7 +61,7 @@ Nothing environment-specific is written in the code. Every name, region, address
 | `onprem_compute_prefixes` | list | required |  | your environment config (`environment/`) | On-prem session-host ranges (AVD-hosts VLAN per P-08 plus the Azure Local AVD lnet range) allowed to the private endpoint. |
 | `azl_spoke_vnet_id` | string | required |  | your environment config (`environment/`) | Azure Local spoke VNet id (lz-azure-local output) for the direct spoke-to-spoke peering and the zone link. |
 | `azl_spoke_prefix` | string | required |  | your environment config (`environment/`) | Azure Local spoke prefix (NSG rules; also the admin source for the jump server). |
-| `log_analytics_workspace_id` | string | required |  | your environment config (`environment/`) | Lab workspace law-* (lz-azure-local output); destination for the AVD DCR, diagnostics and alerts (AVD-LZ-12). |
+| `log_analytics_workspace_id` | string | required |  | your environment config (`environment/`) | Supplied central monitoring workspace; destination for the AVD DCR, diagnostics and alerts (AVD-LZ-12). |
 | `key_vault_id` | string | required |  | your environment config (`environment/`) | Operations vault id (lz-azure-local output). Consumed by scripts only; IaC never reads secrets (AVD-LZ-13). |
 | `action_group_id` | string | required |  | your environment config (`environment/`) | Ops action group id (lz-azure-local output) for budget and alert notifications. |
 | `avd_vnet_prefix` | string | required |  | your environment config (`environment/`) | AVD spoke address space (AVD-LZ-04). |

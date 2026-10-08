@@ -202,6 +202,12 @@ variable "avd_budget_monthly" {
   description = "Monthly budget amount."
 }
 
+variable "deploy_platform_scope_items" {
+  type        = bool
+  default     = false
+  description = "Platform-owned hub peering and policy assignments require explicit ownership approval."
+}
+
 variable "enable_policy_assignments" {
   type        = bool
   description = "Assign the built-in Deny/Audit/Modify policies of design §2.4."

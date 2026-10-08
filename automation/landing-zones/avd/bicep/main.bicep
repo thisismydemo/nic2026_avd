@@ -119,6 +119,9 @@ param avd_budget_monthly int
 @description('Assign the built-in Deny/Audit/Modify policies of design §2.4.')
 param enable_policy_assignments bool = true
 
+@description('Platform-owned hub peering and policy assignments require explicit ownership approval. False uses existing platform delivery.')
+param deploy_platform_scope_items bool = false
+
 @description('Object ids keyed avd_users, avd_admins, lab_operators.')
 param group_object_ids object
 
@@ -193,7 +196,7 @@ module network 'modules/network.bicep' = {
 }
 
 // 2a. Peerings — hub side first (gateway transit must exist before useRemoteGateways is accepted), then spoke side.
-module peerHubToSpoke 'br/public:avm/res/network/virtual-network/virtual-network-peering:0.2.0' = {
+module peerHubToSpoke 'br/public:avm/res/network/virtual-network/virtual-network-peering:0.2.0' = if (deploy_platform_scope_items) {
   name: 'dep-${deployment().name}-peer-hub'
   scope: resourceGroup(hubSubscriptionId, hubResourceGroupName)
   params: {
@@ -355,7 +358,7 @@ module monitoring 'modules/monitoring.bicep' = {
 // 8. Governance — design §2.3/§2.4 (budget, policy). Gap-fill modules: AVM budget cannot mix Actual and Forecasted
 // thresholds; AVM ptn policy-assignment is management-group scoped.
 // ---------------------------------------------------------------------------------------------------------------------
-module budget 'modules/budget.bicep' = {
+module budget 'modules/budget.bicep' = if (avd_budget_monthly > 0) {
   name: 'dep-${deployment().name}-budget'
   params: {
     name: names.budget
@@ -365,7 +368,7 @@ module budget 'modules/budget.bicep' = {
   }
 }
 
-module policy 'modules/policy-assignments.bicep' = if (enable_policy_assignments) {
+module policy 'modules/policy-assignments.bicep' = if (deploy_platform_scope_items && enable_policy_assignments) {
   name: 'dep-${deployment().name}-policy'
   params: {
     location: location
@@ -374,7 +377,7 @@ module policy 'modules/policy-assignments.bicep' = if (enable_policy_assignments
   }
 }
 
-module policyHostsRg 'modules/policy-assignment-rg.bicep' = if (enable_policy_assignments) {
+module policyHostsRg 'modules/policy-assignment-rg.bicep' = if (deploy_platform_scope_items && enable_policy_assignments) {
   name: 'dep-${deployment().name}-policy-hosts'
   scope: resourceGroup(names.rg_hosts)
   dependsOn: [resourceGroups]
