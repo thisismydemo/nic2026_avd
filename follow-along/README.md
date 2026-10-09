@@ -250,7 +250,7 @@ Replace the placeholders in the commands with your own values:
 
 - None.
 
-**In the repo:** `automation/landing-zones/avd (monitoring modules)`
+**In the repo:** `automation/landing-zones/avd`
 
 ### Plain Hyper-V VMs seen in Azure only as Arc machines
 

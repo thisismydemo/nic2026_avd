@@ -103,6 +103,7 @@ param enable_backup = true
 param backup_policy = {
   schedule_time_utc: '03:00'
   retention_days: 7
+  soft_delete_retention_days: 14
 }
 param image_definitions = [
   {

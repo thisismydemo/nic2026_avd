@@ -185,8 +185,9 @@ variable "enable_backup" {
 
 variable "backup_policy" {
   type = object({
-    schedule_time_utc = string
-    retention_days    = number
+    schedule_time_utc          = string
+    retention_days             = number
+    soft_delete_retention_days = number
   })
   description = "Backup policy: schedule_time_utc (HH:mm), retention_days (environment schema shape)."
 }

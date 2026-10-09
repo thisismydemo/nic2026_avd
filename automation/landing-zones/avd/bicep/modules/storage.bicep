@@ -34,7 +34,7 @@ var shareRoleAssignments = [
 var shareList = [share_names.profiles, share_names.odfc]
 
 // ---------------------------------------------------------------------------------------------------------------------
-// Storage account — Premium FileStorage, Entra Kerberos (AADKERB), no shared keys, private endpoint only
+// Premium FileStorage / Entra Kerberos; shared keys follow backup, public endpoint by default (D-029).
 // Microsoft.Storage/storageAccounts azureFilesIdentityBasedAuthentication.directoryServiceOptions = AADKERB;
 // activeDirectoryProperties are optional for AADKERB (cloud-only identities need none). What ARM cannot do —
 // admin consent on the generated app, the kdc_enable_cloud_group_sids tag, the privatelink identifierUri and the
@@ -48,7 +48,7 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.33.1' = {
     tags: tags
     kind: 'FileStorage'
     skuName: 'Premium_LRS'
-    accessTier: 'Premium'
+    // Premium is the SKU/share tier, not the account blob accessTier. Keep the pinned AVM default.
     minimumTlsVersion: 'TLS1_2'
     supportsHttpsTrafficOnly: true
     // Azure Backup for Azure Files needs 'Allow storage account key access' on the source account (Learn: support matrix for Azure Files backup),
@@ -130,6 +130,19 @@ module recoveryVault 'br/public:avm/res/recovery-services/vault:0.13.2' = if (en
     location: location
     tags: tags
     publicNetworkAccess: 'Enabled'
+    softDeleteSettings: {
+      softDeleteState: 'AlwaysON'
+      enhancedSecurityState: 'AlwaysON'
+      softDeleteRetentionPeriodInDays: backup_policy.soft_delete_retention_days
+    }
+    restoreSettings: {
+      crossSubscriptionRestoreSettings: {
+        crossSubscriptionRestoreState: 'Enabled'
+      }
+    }
+    sourceScanConfiguration: {
+      state: 'Disabled'
+    }
     redundancySettings: {
       standardTierStorageRedundancy: 'LocallyRedundant'
     }
@@ -143,6 +156,7 @@ module recoveryVault 'br/public:avm/res/recovery-services/vault:0.13.2' = if (en
           schedulePolicy: {
             schedulePolicyType: 'SimpleSchedulePolicy'
             scheduleRunFrequency: 'Daily'
+            scheduleWeeklyFrequency: 0
             scheduleRunTimes: [backupTime]
           }
           retentionPolicy: {
@@ -161,6 +175,7 @@ module recoveryVault 'br/public:avm/res/recovery-services/vault:0.13.2' = if (en
     diagnosticSettings: [
       {
         workspaceResourceId: log_analytics_workspace_id
+        logAnalyticsDestinationType: 'AzureDiagnostics'
       }
     ]
   }
