@@ -2,7 +2,7 @@
 
 This handout answers the questions attendees ask most often and lists where to read more.
 
-**Status:** prepared 2026-10-06 against Microsoft Learn; prices and support change, so follow the pricing and documentation links.
+**Status:** prepared 2026-10-06; cloud-only Azure Files guidance reviewed 2026-10-09 against Microsoft Learn; prices and support change, so follow the pricing and documentation links.
 
 ## Choosing a deployment model
 
@@ -40,7 +40,7 @@ The Identity Reference Architecture handout has the detail.
 
 **How does FSLogix store profiles?** In VHDX containers on an SMB share, attached at sign-in.
 
-**What is the cloud-first storage option?** Azure Files with Microsoft Entra Kerberos. Session hosts need no domain controller connectivity, and a storage account uses one identity source.
+**What is the cloud-first storage option?** Azure Files with Microsoft Entra Kerberos supports cloud-only identities as generally available in the public cloud. Cloud-only SMB authentication needs no domain controller; hybrid ACL administration and on-premises resource access can still need one. A storage account uses one identity source.
 
 **What storage works with Azure Local hosts?** A file server VM, Scale-Out File Server on the cluster, or Azure Files. FSLogix needs an SMB service, not a cluster shared volume path.
 
@@ -142,3 +142,6 @@ In this repository:
 - [Identity reference architecture](Identity_Reference_Architecture.md)
 - [FSLogix configuration guide](FSLogix_Configuration_Guide.md)
 - [Deployment checklist](Deployment_Checklist.md)
+
+
+Cloud-only Azure Files guidance reviewed 9 October 2026: [Azure Files GA release notes](https://learn.microsoft.com/en-us/azure/storage/files/files-whats-new), [Entra Kerberos prerequisites](https://learn.microsoft.com/en-us/azure/storage/files/storage-files-identity-auth-hybrid-identities-enable), and [supported directory ACL methods](https://learn.microsoft.com/en-us/azure/storage/files/storage-files-identity-configure-file-level-permissions).

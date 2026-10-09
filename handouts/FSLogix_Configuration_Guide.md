@@ -2,7 +2,7 @@
 
 This handout summarizes FSLogix profile container configuration choices for the three Azure Virtual Desktop deployment models.
 
-**Status:** prepared 2026-10-06 against Microsoft Learn; check the FSLogix and Azure Files documentation for your versions before you deploy.
+**Status:** prepared 2026-10-06; cloud-only Azure Files guidance reviewed 2026-10-09 against Microsoft Learn; check the FSLogix and Azure Files documentation for your versions before you deploy.
 
 ## What a profile container is
 
@@ -69,11 +69,11 @@ SMB permissions use NTFS ACLs: only the user (CREATOR OWNER) should have access 
 
 For Azure Files:
 
-- Assign share-level permissions. The recommended default share-level permission is Storage File Data SMB Share Contributor for all authenticated identities.
+- Assign share-level permissions. Assign Storage File Data SMB Share Contributor to the approved user group at the required share scope; grant administrative roles only to approved administrators. Use a default grant to all authenticated identities only when that broader scope is intentional.
 - To set Windows ACLs, use a user or group with the Storage File Data SMB Share Elevated Contributor role, or mount the share with the storage account key first.
-- Apply the ACLs with `icacls` or File Explorer (File Explorer cannot be used for cloud-only identities), or let FSLogix set them when it creates a folder, with the `SIDDirSDDL` setting.
+- For hybrid identities, apply ACLs with `icacls` or File Explorer from a client with domain controller connectivity. For cloud-only identities, use the Azure portal or RestSetAcls; neither `icacls` nor File Explorer is supported. FSLogix `SIDDirSDDL` can govern newly created profile folders after share and root permissions are configured.
 
-Example `icacls` pattern with placeholders:
+Hybrid-identity `icacls` example with placeholders (requires domain controller connectivity; not a cloud-only ACL procedure):
 
 ```text
 icacls \\<server>\<share> /inheritance:r
@@ -86,7 +86,7 @@ icacls \\<server>\<share> /grant:r "<USERS-GROUP>":(M)
 
 The Identity Reference Architecture handout has the detail. In short:
 
-- With Microsoft Entra Kerberos, session hosts need no domain controller connectivity.
+- Cloud-only Azure Files SMB authentication with Microsoft Entra Kerberos is generally available in the public cloud and needs no domain controller. Hybrid ACL administration and on-premises resource access can still require domain controller connectivity.
 - Enable it on the storage account, grant admin consent to the generated application, and exclude that application from MFA Conditional Access policies.
 - Set `CloudKerberosTicketRetrievalEnabled` to `1` on the clients (Intune settings catalog on multi-session, Group Policy or registry), and `LoadCredKeyFromProfile` to `1` under the `AzureADAccount` policy key.
 - Cloud-only identities also need the `kdc_enable_cloud_group_sids` tag in the application manifest.
@@ -148,3 +148,6 @@ type=smb,name="PRIMARY",connectionString=\\<storage-account-name-1>.file.core.wi
 - [ ] The Cloud Cache decision is recorded.
 - [ ] Sign-in is tested on every deployment model.
 - [ ] A growth and size plan is recorded.
+
+
+Cloud-only Azure Files guidance reviewed 9 October 2026: [Azure Files GA release notes](https://learn.microsoft.com/en-us/azure/storage/files/files-whats-new), [Entra Kerberos prerequisites](https://learn.microsoft.com/en-us/azure/storage/files/storage-files-identity-auth-hybrid-identities-enable), and [supported directory ACL methods](https://learn.microsoft.com/en-us/azure/storage/files/storage-files-identity-configure-file-level-permissions).

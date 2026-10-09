@@ -2,9 +2,11 @@
 
 A reference for tracing identity from user sign-in through session-host access to an Azure Files profile share.
 
-**Status:** prepared 2026-10-06 against Microsoft Learn; identity support changes by release and region, so re-check the linked documentation before you design.
+**Status:** prepared 2026-10-06; cloud-only Azure Files guidance reviewed 2026-10-09 against Microsoft Learn; identity support changes by release and region, so re-check the linked documentation before you design.
 
 ![Identity: three paths, one proof](Identity_Three_Paths.png)
+
+The diagram shows Windows 11 Enterprise clients. Azure and Azure Local support multi-session; Azure Virtual Desktop Hybrid uses single-session Windows clients ([Microsoft support table](https://learn.microsoft.com/en-us/azure/virtual-desktop/hybrid-overview#supported-operating-systems-and-licensing)).
 
 ## The three paths
 
@@ -20,7 +22,7 @@ A proof you can show: run `klist get cifs/<storageaccount>.file.core.windows.net
 
 **User identities**
 
-- **Cloud-only:** created and managed only in Microsoft Entra ID. For Azure Files with Microsoft Entra Kerberos this is labelled preview in parts of Microsoft Learn (see the Azure Files section).
+- **Cloud-only:** created and managed only in Microsoft Entra ID. Azure Files with Microsoft Entra Kerberos supports these identities as generally available in the public cloud, subject to the prerequisites below.
 - **Hybrid:** AD DS identities synced to Microsoft Entra ID with Microsoft Entra Connect Sync or Microsoft Entra Cloud Sync.
 - **External identities:** single sign-on must be enabled on the host pool, and Azure Files support for external identities is limited to FSLogix scenarios on Azure Virtual Desktop in the public cloud.
 
@@ -65,9 +67,9 @@ Cautions:
 |---|---|---|
 | AD DS | Clients that can reach domain controllers | Sync identities to Microsoft Entra ID for share permissions. |
 | Microsoft Entra Domain Services | Cloud-only or hybrid identities; clients joined to the managed domain | |
-| Microsoft Entra Kerberos | Cloud-first or hybrid; Microsoft Entra-joined clients; FSLogix; clients need no domain controller connectivity | Exclude the storage account application from MFA Conditional Access policies. For cloud-only identities, manage file and directory permissions with the Azure portal or RestSetAcls; editing permissions in File Explorer is not supported for them. |
+| Microsoft Entra Kerberos | Cloud-only or hybrid identities; Entra-joined or hybrid-joined clients; cloud-only Azure Files SMB authentication needs no domain controller | Exclude the storage account application from MFA Conditional Access policies. For cloud-only identities, manage file and directory permissions with the Azure portal or RestSetAcls; File Explorer and icacls are not supported for their ACL management. |
 
-A storage account uses only one identity source. Hybrid identities with Microsoft Entra Kerberos work in all clouds; cloud-only identities are supported in public cloud regions only. Microsoft Learn is not consistent about the status of cloud-only identities: the Microsoft Entra Kerberos introduction and the Azure Files what's-new page label the support as preview, while the Azure Files setup article describes it without a label. Treat it as preview and confirm the current status before you rely on it.
+A storage account uses only one identity source. Hybrid identities with Microsoft Entra Kerberos work in all clouds; cloud-only identities are supported in public cloud regions only. Cloud-only Azure Files SMB identity support is generally available. Client, storage-application consent/tag, share RBAC and directory ACL prerequisites still apply. Hybrid ACL management through Windows tools needs domain controller connectivity; cloud-only ACL management through the portal or RestSetAcls does not.
 
 Microsoft Entra Kerberos setup:
 
@@ -118,3 +120,6 @@ Local Identity with Key Vault is not passwordless: it needs a local administrato
 - [ ] The Azure Files identity source is chosen and enabled once.
 - [ ] The storage application is consented and excluded from MFA.
 - [ ] Client Kerberos settings are deployed.
+
+
+Cloud-only Azure Files guidance reviewed 9 October 2026: [Azure Files GA release notes](https://learn.microsoft.com/en-us/azure/storage/files/files-whats-new), [Entra Kerberos prerequisites](https://learn.microsoft.com/en-us/azure/storage/files/storage-files-identity-auth-hybrid-identities-enable), and [supported directory ACL methods](https://learn.microsoft.com/en-us/azure/storage/files/storage-files-identity-configure-file-level-permissions).
