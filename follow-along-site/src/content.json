@@ -93,6 +93,10 @@
       "minutes": 2
     }
   ],
+  "downloads": {
+    "repo": "nic2026_avd",
+    "guide": "AVD_Anywhere_Follow_Along_Guide"
+  },
   "demos": [
     {
       "id": "a0-three-pools",
