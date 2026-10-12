@@ -2,7 +2,7 @@
 
 This handout summarizes FSLogix profile container configuration choices for the three Azure Virtual Desktop deployment models.
 
-**Status:** prepared 2026-10-06; cloud-only Azure Files guidance reviewed 2026-10-09 against Microsoft Learn; check the FSLogix and Azure Files documentation for your versions before you deploy.
+**Status:** prepared 2026-10-06; cloud-only Azure Files guidance reviewed 2026-10-09 against Microsoft Learn; identity and store matrix added 2026-10-12; check the FSLogix and Azure Files documentation for your versions before you deploy.
 
 ## What a profile container is
 
@@ -19,6 +19,30 @@ Antivirus exclusions for FSLogix are a prerequisite; see the FSLogix prerequisit
 | Azure Virtual Desktop Hybrid | Any SMB path: Azure Files with Microsoft Entra Kerberos, or on-premises SMB with AD DS Kerberos | |
 
 Microsoft Learn notes that keeping profiles on the Azure Local instance's own storage gives low latency and a simpler design, but it may limit scalability compared with a separate file share, it suits smaller deployments, and it raises the capacity and performance demand on the cluster. All-flash storage (SSD or NVMe) is preferable to hybrid storage for this approach.
+
+## Identity and store: what works
+
+FSLogix mounts the container as the signed-in user over SMB, so the share must accept a Kerberos ticket that the session host can obtain for that user. The profile store and the session host identity are therefore one decision. Microsoft Entra Kerberos covers Azure Files only; every other SMB store uses AD DS Kerberos, which a cloud-only user cannot obtain.
+
+| Profile store | Authentication on the share | Entra-joined host, cloud-only user | Entra-joined host, hybrid user | AD DS or hybrid-joined host, hybrid user |
+|---|---|---|---|---|
+| Azure Files | Microsoft Entra Kerberos | Yes (needs admin consent, the `kdc_enable_cloud_group_sids` tag for cloud groups, `CloudKerberosTicketRetrievalEnabled` on the host) | Yes | Yes |
+| Azure Files | AD DS (storage account joined to the domain) | No | Yes, with line of sight to a domain controller | Yes |
+| Azure NetApp Files | AD DS | No | Yes, with line of sight to a domain controller | Yes |
+| Scale-Out File Server guest cluster on Azure Local (continuously available shares) | AD DS | No | Yes, with line of sight to a domain controller | Yes |
+| File server VM (single, not continuously available) | AD DS | No | Yes | Yes, without transparent failover |
+| NAS, vSAN File Services, Nutanix Files | AD DS | No | Yes | Yes |
+| Microsoft Entra Domain Services with Azure Files | Microsoft Entra Domain Services | No | Hosts joined to the managed domain only | Not applicable |
+
+Per deployment model, the choice usually follows the store:
+
+| Model | Host join options | Typical profile options | Path to the profile |
+|---|---|---|---|
+| Azure | Microsoft Entra join, hybrid join, AD DS join | Azure Files (Microsoft Entra Kerberos or AD DS), Azure NetApp Files, a file server VM | In region, public or private endpoint |
+| Azure Local | AD DS join, with Microsoft Entra hybrid join for single sign-on | Scale-Out File Server on the cluster, Azure Files over the WAN, a file server VM, NAS | On-site SMB at LAN latency, or outbound TCP 445 to Azure Files |
+| Azure Virtual Desktop Hybrid | Microsoft Entra join, AD DS join or hybrid join (Windows Server: AD DS or hybrid join) | The same on-site options as Azure Local, or Azure Files | On-site SMB, or outbound TCP 445 to Azure Files |
+
+Trade-offs: Microsoft Entra Kerberos allows cloud-only users and needs no domain controller, but profiles live in Azure, so on-site hosts pay WAN latency and need outbound TCP 445. An on-site Scale-Out File Server keeps profiles at LAN latency and survives a host failure through continuous availability, but hosts and users need AD DS and the cluster carries the profile capacity twice (the guest mirror on top of the host mirror). To use the same profile on-site and in Azure, Cloud Cache with both providers is the pattern (next sections); it needs hybrid users, because every provider must accept the user.
 
 ## Standard configuration
 

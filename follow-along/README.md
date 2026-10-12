@@ -9,7 +9,7 @@ Replace the placeholders in the commands with your own values:
 - `<sub>` — your subscription id
 - `<rg>` — your resource group for the AVD control plane
 - `<location>` — an Azure region, for example eastus
-- `<user>` — a cloud-only test user, for example user1@yourtenant.onmicrosoft.com
+- `<user>` — a test user, for example user1@yourtenant.onmicrosoft.com (cloud-only works for Azure Files with Entra Kerberos; an on-site AD share such as a SOFS needs a hybrid user synchronized from AD)
 - `<storageaccount>` — a globally unique storage account name for the profile share
 - `<profile-share>` — the Azure Files share that holds the profile containers
 - `<odfc-share>` — the Azure Files share that holds the Office containers
@@ -55,7 +55,7 @@ Replace the placeholders in the commands with your own values:
 - An Entra-joined Windows 11 VM
 - A storage account (FileStorage or StorageV2) with a file share
 - Rights to grant admin consent
-- Note: cloud-only identity support is a preview feature
+- Note: cloud-only identities are supported (GA) for Azure Files with Entra Kerberos; check the current Windows 11 build requirement on Microsoft Learn
 
 **Steps**
 
@@ -251,6 +251,36 @@ Replace the placeholders in the commands with your own values:
 - None.
 
 **In the repo:** `automation/landing-zones/avd`
+
+### Sizing AVD on Azure Local: the two public guides and this lab's numbers
+
+**Goal:** Size an AVD solution on Azure Local bottom-up for your own users: session hosts and the SOFS that serves the FSLogix profiles.
+
+**You need**
+
+- A browser: https://azurelocal.cloud/azurelocal-avd/ and https://azurelocal.cloud/azurelocal-sofs-fslogix/architecture/capacity-planning/
+- Your user count, profile size per user type and growth estimate
+- Your cluster's node count, capacity drives per node and memory per node
+
+**Steps**
+
+1. **Read the AVD on Azure Local architecture.** Open https://azurelocal.cloud/azurelocal-avd/ and read the Architecture and Deployment Scenarios pages: session hosts are Azure Local VMs on a logical network, managed from Azure. Pick the scenario closest to yours and size the session hosts from user density (vCPU and memory per user).
+   - You should see: You have a session-host count and size (vCPU, memory, OS disk) for your users.
+2. **Size the profile storage.** Open https://azurelocal.cloud/azurelocal-sofs-fslogix/architecture/capacity-planning/ and compare https://azurelocal.cloud/azurelocal-sofs-fslogix/architecture/scenarios/. Compute usable = users × profile size × (1 + growth); guest pool = usable × guest mirror copies; data disks per VM = pool ÷ SOFS VMs; host volume per VM = OS disk + data disks + overhead; raw = host volumes × host mirror copies. Worked example from the session (two hosts): 20 users × 30 GB + 20 % = 720 GB usable → 1.44 TB guest two-way pool → 2 VMs × 4 × 256 GB (one disk per VM kept as repair reserve) → two 1.5 TiB host volumes → 6 TiB raw. On two hosts use two SOFS VMs, one per host, with a cloud witness: a third VM would share a host and losing that host would take the guest quorum.
+   - You should see: You have usable, guest pool, data-disk, host-volume and raw figures for the profiles.
+3. **Check the fit on the cluster.** Add the session-host and other VM volumes to the profile volumes, keep one capacity drive per node unallocated as the repair reserve, and check that every VM can restart on the remaining nodes when one node is down (vCPU and memory).
+   - You should see: Allocated volumes fit inside usable capacity minus the reserve, and the VMs fit on N-1 nodes.
+
+**Troubleshooting**
+
+- Raw-to-usable looks far worse than 4:1 at small scale: the fixed OS disks and the second mirror dominate small designs; compare the guide's small-shop scenario.
+- Does not fit on N-1 nodes: reduce density per host, add a node, or accept that some VMs stay down during a node outage, and write that down.
+
+**Clean up**
+
+- None: nothing is deployed.
+
+**In the repo:** `handouts/Realm_Comparison.md`
 
 ### Plain Hyper-V VMs seen in Azure only as Arc machines
 
@@ -579,6 +609,35 @@ Replace the placeholders in the commands with your own values:
 **Clean up**
 
 - None.
+
+**In the repo:** `handouts/Deployment_Checklist.md`
+
+### Crossing 6: the Observability Agent explains the failure (preview)
+
+**Goal:** Investigate an Azure Monitor alert with the Azure Copilot Observability Agent (preview) and keep the result as an issue.
+
+**You need**
+
+- Access to Azure Copilot in your tenant
+- An Azure Monitor workspace associated with the subscription (it holds the issues)
+- Issue Contributor, Monitoring Contributor or Contributor on that workspace
+- A fired Azure Monitor alert, for example a session-host alert, in a region where the agent is available
+
+**Steps**
+
+1. **Start an investigation from an alert.** Open a fired alert in Azure Monitor > Alerts and select Investigate. Confirm the scope the agent proposes.
+   - You should see: The agent reports its plan, then findings, hypotheses ruled out and next steps.
+2. **Keep the result.** Select Create issue to save the investigation as an Azure Monitor issue in your Azure Monitor workspace.
+   - You should see: The issue is listed under Monitor > Issues with the investigation attached.
+
+**Troubleshooting**
+
+- Asked for an Azure Monitor workspace: associate the subscription with one (once per subscription).
+- No Investigate action: check that your account has Azure Copilot access.
+
+**Clean up**
+
+- Close or delete test issues; chat and investigations are billed per use.
 
 **In the repo:** `handouts/Deployment_Checklist.md`
 
