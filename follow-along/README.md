@@ -715,7 +715,7 @@ Replace the placeholders in the commands with your own values:
 
 ### GPU on Azure Local: one L4 by DDA on a dedicated session host
 
-**Goal:** Understand GPU by DDA versus GPU partitioning on Azure Local and what each needs.
+**Goal:** Understand GPU by DDA versus GPU partitioning on Azure Local, what the free driver gives (compute and AI) and what desktop graphics acceleration needs (NVIDIA vWS licensing).
 
 **In the repo:** `automation/azure-local/cluster-configure/gpu`
 
