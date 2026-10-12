@@ -713,9 +713,9 @@ Replace the placeholders in the commands with your own values:
 
 **In the repo:** `automation/avd/session-hosts-azure-local`
 
-### GPU on Azure Local: assignment mode and evidence
+### GPU on Azure Local: one L4 by DDA on a dedicated session host
 
-**Goal:** Understand the two GPU modes.
+**Goal:** Understand GPU by DDA versus GPU partitioning on Azure Local and what each needs.
 
-**In the repo:** `handouts/Realm_Comparison.md`
+**In the repo:** `automation/azure-local/cluster-configure/gpu`
 

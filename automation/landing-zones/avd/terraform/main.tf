@@ -309,6 +309,30 @@ module "nsg_imgbuild" {
       destination_address_prefix = var.avd_subnets.imgbuild
       destination_port_range     = "60000-60001"
     }
+    aib_winrm_in = {
+      name                       = "AllowImageBuilderWinRmInbound"
+      priority                   = 110
+      direction                  = "Inbound"
+      access                     = "Allow"
+      protocol                   = "Tcp"
+      source_address_prefix      = var.avd_subnets.imgbuild
+      source_port_range          = "*"
+      destination_address_prefix = var.avd_subnets.imgbuild
+      destination_port_range     = "5986"
+      description                = "Image Builder proxy to Windows build VM within the image-build subnet"
+    }
+    aib_private_link_proxy_in = {
+      name                       = "AllowImageBuilderPrivateLinkProxyInbound"
+      priority                   = 120
+      direction                  = "Inbound"
+      access                     = "Allow"
+      protocol                   = "Tcp"
+      source_address_prefix      = var.avd_subnets.imgbuild
+      source_port_range          = "*"
+      destination_address_prefix = var.avd_subnets.imgbuild
+      destination_port_range     = "60000"
+      description                = "Image Builder Private Link NAT source to proxy within the image-build subnet"
+    }
     deny_in = {
       name                       = "DenyAllInbound"
       priority                   = 4000
@@ -1031,7 +1055,9 @@ resource "azurerm_role_definition" "aib_network" {
 locals {
   role_assignments = merge(
     {
-      hostpool_reader_arc  = { scope = module.resource_groups["arc"].resource_id, role = "Reader", principal = module.hostpool_identity.principal_id, type = "ServicePrincipal" }
+      hostpool_reader_arc = { scope = module.resource_groups["arc"].resource_id, role = "Reader", principal = module.hostpool_identity.principal_id, type = "ServicePrincipal" }
+      # AVD on Azure Local: Reader on the session hosts' resource group (the Azure Local cluster RG, other subscription).
+      hostpool_reader_azl  = { scope = "/subscriptions/${var.subscription_id_azl}/resourceGroups/${var.names["rg_azl_cluster"]}", role = "Reader", principal = module.hostpool_identity.principal_id, type = "ServicePrincipal" }
       users_vmlogin_hosts  = { scope = module.resource_groups["hosts"].resource_id, role = "Virtual Machine User Login", principal = var.group_object_ids.avd_users, type = "Group" }
       users_vmlogin_arc    = { scope = module.resource_groups["arc"].resource_id, role = "Virtual Machine User Login", principal = var.group_object_ids.avd_users, type = "Group" }
       admins_vmadmin_hosts = { scope = module.resource_groups["hosts"].resource_id, role = "Virtual Machine Administrator Login", principal = var.group_object_ids.avd_admins, type = "Group" }
@@ -1066,4 +1092,13 @@ resource "azurerm_role_assignment" "aib_network" {
   role_definition_id = azurerm_role_definition.aib_network.role_definition_resource_id
   principal_id       = module.aib_identity.principal_id
   principal_type     = "ServicePrincipal"
+}
+
+# AIB attaches its canonical UAMI to the build VM; grant assignment only on that identity.
+# Import any operational repair assignment before applying this resource to an existing environment.
+resource "azurerm_role_assignment" "aib_identity_operator" {
+  scope                = module.aib_identity.resource_id
+  role_definition_name = "Managed Identity Operator"
+  principal_id         = module.aib_identity.principal_id
+  principal_type       = "ServicePrincipal"
 }

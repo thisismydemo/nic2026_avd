@@ -30,9 +30,14 @@ Name of the temporary disk.
 Optional Azure Local storage path resource ID.
 .PARAMETER SasDurationSeconds
 Lifetime of the read-only disk SAS.
+.PARAMETER Tags
+Tags merged onto the temporary disk and the Azure Local image (az tag update; image update fails on this build).
+.PARAMETER SecurityType
+Security type of the temporary OS disk; TrustedLaunch when the gallery image definition is TrustedLaunch.
 .PARAMETER Execute
 Perform the import; without it only a plan is printed.
 #>
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'Private helpers inside a script that is gated as a whole (-Execute or -WhatIf); they never run on their own.')]
 [CmdletBinding(SupportsShouldProcess)]
 param(
     [Parameter(Mandatory)][string]$AvdSubscriptionId,
@@ -46,6 +51,8 @@ param(
     [Parameter(Mandatory)][string]$TempDiskName,
     [string]$StoragePathId = '',
     [ValidateRange(600, 14400)][int]$SasDurationSeconds = 3600,
+    [hashtable]$Tags = @{},
+    [ValidateSet('', 'Standard', 'TrustedLaunch')][string]$SecurityType = '',
     [switch]$Execute
 )
 
@@ -64,6 +71,15 @@ if (-not (Get-Command Invoke-AzCli -ErrorAction SilentlyContinue)) {
 
         $start = [System.Diagnostics.ProcessStartInfo]::new()
         $start.FileName = 'az'
+        if ($IsWindows) {
+            # az is az.cmd on Windows: cmd.exe would split a SAS URL at '&'. Run the CLI's own Python directly instead.
+            $azCmd = (Get-Command az.cmd -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1).Source
+            $python = if ($azCmd) { Join-Path (Split-Path (Split-Path $azCmd -Parent) -Parent) 'python.exe' }
+            if ($python -and (Test-Path -LiteralPath $python)) {
+                $start.FileName = $python
+                foreach ($p in @('-IBm', 'azure.cli')) { [void]$start.ArgumentList.Add($p) }
+            }
+        }
         $start.UseShellExecute = $false
         $start.RedirectStandardOutput = $true
         $start.RedirectStandardError = $true
@@ -115,12 +131,24 @@ try {
 catch {
     throw 'The Azure Local image existence check could not be completed.'
 }
+function Set-ImageTag([string]$ImageId) {
+    # image create --tags and image update fail on this build (serializer bug): merge tags on the resource ID instead.
+    if ($Tags.Count -eq 0 -or [string]::IsNullOrWhiteSpace($ImageId)) { return }
+    $tagArguments = @('tag', 'update', '--resource-id', $ImageId, '--operation', 'Merge', '--subscription', $AzlSubscriptionId, '--only-show-errors', '--tags')
+    foreach ($k in $Tags.Keys) { $tagArguments += "$k=$($Tags[$k])" }
+    $null = Invoke-AzCli -Arguments $tagArguments
+}
+
 if ($existing.ExitCode -eq 0) {
-    throw 'The Azure Local image already exists; replacement is not supported.'
+    # Idempotent rerun: an existing image is never replaced; its ID is returned (tags merged again).
+    $existingId = ([string]$existing.StdOut).Trim()
+    Set-ImageTag $existingId
+    return $existingId
 }
 
 # Never touch a disk this run did not create: refuse when the temporary disk name is already taken.
-$null = Set-AzContext -WhatIf:$false -SubscriptionId $AvdSubscriptionId
+# Process scope: other sessions on this machine keep their default Az context.
+$null = Set-AzContext -WhatIf:$false -SubscriptionId $AvdSubscriptionId -Scope Process
 $taken = Get-AzDisk -ResourceGroupName $TempDiskResourceGroup -DiskName $TempDiskName -ErrorAction SilentlyContinue
 if ($null -ne $taken) {
     throw 'The temporary disk name is already in use; choose another name.'
@@ -130,7 +158,12 @@ $diskCreated = $false
 $accessAttempted = $false
 $sas = $null
 try {
+    # Learn (Azure Local VM image via Azure Compute Gallery): the disk is exported in the gallery's own subscription and
+    # resource group; Azure Local reads it through the SAS.
+    # A TrustedLaunch image definition only allows OS disks with SecurityType TrustedLaunch (BadRequest otherwise).
     $diskConfig = New-AzDiskConfig -Location $Location -CreateOption FromImage -GalleryImageReference @{ Id = $GalleryImageVersionId }
+    if ($SecurityType) { $diskConfig = Set-AzDiskSecurityProfile -Disk $diskConfig -SecurityType $SecurityType -WhatIf:$false }
+    if ($Tags.Count -gt 0) { $diskConfig.Tags = [System.Collections.Generic.Dictionary[string, string]]::new(); foreach ($k in $Tags.Keys) { $diskConfig.Tags[$k] = [string]$Tags[$k] } }
     $null = New-AzDisk -ResourceGroupName $TempDiskResourceGroup -DiskName $TempDiskName -Disk $diskConfig -Confirm:$false
     $diskCreated = $true
 
@@ -187,7 +220,9 @@ try {
     if ($shown.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace([string]$shown.StdOut)) {
         throw 'Image lookup failed.'
     }
-    ([string]$shown.StdOut).Trim()
+    $imageId = ([string]$shown.StdOut).Trim()
+    Set-ImageTag $imageId
+    $imageId
 }
 catch {
     throw 'The Azure Local image was created but its resource ID could not be retrieved.'

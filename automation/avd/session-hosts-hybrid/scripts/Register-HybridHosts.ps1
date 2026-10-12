@@ -75,7 +75,7 @@ if (-not $Execute) {
     return
 }
 
-$null = Set-AzContext -WhatIf:$false -SubscriptionId $SubscriptionId
+$null = Set-AzContext -WhatIf:$false -SubscriptionId $SubscriptionId -Tenant (Get-AzContext).Tenant.Id
 foreach ($machine in $MachineName) {
     if (-not $PSCmdlet.ShouldProcess($machine, 'Register Arc machine with AVD')) {
         continue

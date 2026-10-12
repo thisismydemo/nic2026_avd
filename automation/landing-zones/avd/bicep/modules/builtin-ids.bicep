@@ -11,6 +11,7 @@ var builtInRoles = {
   desktopVirtualizationReader: '49a72310-ab8d-41df-bbb0-79b649203868' // Desktop Virtualization Reader
   azureConnectedMachineOnboarding: 'b64e21ea-ac4e-4cdf-9dc9-5b892992bee7' // Azure Connected Machine Onboarding
   tagContributor: '4a9ae827-6dc8-4573-8ac7-8239d42aa03f' // Tag Contributor
+  managedIdentityOperator: 'f1a07417-d97a-45cb-824c-7a7467783830' // Managed Identity Operator
 }
 
 @export()
@@ -33,6 +34,7 @@ var builtInDisplayNames = {
     desktopVirtualizationReader: 'Desktop Virtualization Reader'
     azureConnectedMachineOnboarding: 'Azure Connected Machine Onboarding'
     tagContributor: 'Tag Contributor'
+    managedIdentityOperator: 'Managed Identity Operator'
   }
   policies: {
     allowedLocations: 'Allowed locations'

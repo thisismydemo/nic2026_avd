@@ -490,19 +490,19 @@
     },
     {
       "id": "a4b-gpu-evidence",
-      "title": "GPU on Azure Local: assignment mode and evidence",
+      "title": "GPU on Azure Local: one L4 by DDA on a dedicated session host",
       "section": "4",
-      "mode": "recorded",
+      "mode": "live+recorded",
       "minutes": 0.5,
       "followAlong": {
         "level": "read",
-        "goal": "Understand the two GPU modes.",
+        "goal": "Understand GPU by DDA versus GPU partitioning on Azure Local and what each needs.",
         "needs": [],
         "steps": [],
         "troubleshooting": [],
         "cleanup": [],
         "repoPaths": [
-          "handouts/Realm_Comparison.md"
+          "automation/azure-local/cluster-configure/gpu"
         ]
       }
     },

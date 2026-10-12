@@ -76,34 +76,21 @@ param scaling_plan = {
         'Thursday'
         'Friday'
       ]
-      ramp_up_start_time: {
-        hour: 7
-        minute: 0
-      }
-      ramp_up_load_balancing_algorithm: 'BreadthFirst'
+      ramp_up_start_time: '07:00'
+      ramp_up_load_balancing: 'BreadthFirst'
       ramp_up_minimum_hosts_percent: 50
       ramp_up_capacity_threshold_percent: 60
-      peak_start_time: {
-        hour: 9
-        minute: 0
-      }
-      peak_load_balancing_algorithm: 'BreadthFirst'
-      ramp_down_start_time: {
-        hour: 18
-        minute: 0
-      }
-      ramp_down_load_balancing_algorithm: 'DepthFirst'
+      peak_start_time: '09:00'
+      peak_load_balancing: 'BreadthFirst'
+      ramp_down_start_time: '18:00'
+      ramp_down_load_balancing: 'DepthFirst'
       ramp_down_minimum_hosts_percent: 50
       ramp_down_capacity_threshold_percent: 60
       ramp_down_force_logoff_users: false
       ramp_down_wait_time_minutes: 30
       ramp_down_notification_message: 'Your session may be signed out for scheduled scaling.'
-      ramp_down_stop_hosts_when: 'ZeroSessions'
-      off_peak_start_time: {
-        hour: 20
-        minute: 0
-      }
-      off_peak_load_balancing_algorithm: 'DepthFirst'
+      off_peak_start_time: '20:00'
+      off_peak_load_balancing: 'DepthFirst'
     }
   ]
 }

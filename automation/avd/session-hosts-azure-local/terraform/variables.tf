@@ -55,8 +55,8 @@ variable "names" {
 variable "host_count" {
   type = number
   validation {
-    condition     = var.host_count >= 1 && var.host_count <= 2 && floor(var.host_count) == var.host_count
-    error_message = "host_count must be an integer from 1 to 2."
+    condition     = var.host_count >= 1 && var.host_count <= 3 && floor(var.host_count) == var.host_count
+    error_message = "host_count must be an integer from 1 to 3."
   }
 }
 
@@ -84,6 +84,12 @@ variable "logical_network_id" {
   type = string
 }
 
+variable "dns_servers" {
+  description = "DNS servers of the logical network, repeated on each NIC (NIC DNS is immutable after creation)."
+  type        = list(string)
+  default     = []
+}
+
 variable "image_id" {
   type = string
 }
@@ -92,9 +98,61 @@ variable "dcr_id" {
   type = string
 }
 
-variable "entra_join_extension" {
-  type    = bool
-  default = true
+variable "storage_path_ids" {
+  description = "Storage path resource IDs, one per host in host order."
+  type        = list(string)
+}
+
+variable "join_type" {
+  description = "AD (JsonADDomainExtension, D-050), Entra (AADLoginForWindows) or None."
+  type        = string
+  default     = "AD"
+  validation {
+    condition     = contains(["AD", "Entra", "None"], var.join_type)
+    error_message = "join_type must be AD, Entra or None."
+  }
+}
+
+variable "domain_fqdn" {
+  type    = string
+  default = ""
+}
+
+variable "domain_ou_path" {
+  type    = string
+  default = ""
+}
+
+variable "vcpu_per_host" {
+  description = "Per-host vCPU overrides in host order (0 or missing = vcpu)."
+  type        = list(number)
+  default     = []
+}
+
+variable "memory_mb_per_host" {
+  description = "Per-host memory overrides in MB in host order (0 or missing = memory_mb)."
+  type        = list(number)
+  default     = []
+}
+
+variable "gpu_dda_counts" {
+  description = "GPU DDA devices per host in host order; missing entries mean 0."
+  type        = list(number)
+  default     = []
+}
+
+variable "domain_join_username" {
+  description = "Resolved by the deploy script in memory (join_type AD)."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "domain_join_password" {
+  description = "Resolved by the deploy script in memory (join_type AD). Terraform state holds it; keep state in the private encrypted backend."
+  type        = string
+  sensitive   = true
+  default     = ""
 }
 
 variable "enable_monitoring" {

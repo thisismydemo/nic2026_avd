@@ -112,7 +112,7 @@ resource imageTemplates 'Microsoft.VirtualMachineImages/imageTemplates@2025-10-0
         name: 'InstallTeamsWebRtc'
         runElevated: true
         runAsSystem: true
-        inline: teamsLines
+        inline: concat(['$WebRtcRetainForVerification = $true'], teamsLines)
       }
       {
         type: 'PowerShell'
@@ -151,6 +151,13 @@ resource imageTemplates 'Microsoft.VirtualMachineImages/imageTemplates@2025-10-0
       {
         type: 'WindowsRestart'
         restartTimeout: '10m'
+      }
+      {
+        type: 'PowerShell'
+        name: 'VerifyTeamsWebRtc'
+        runElevated: true
+        runAsSystem: true
+        inline: concat(['$WebRtcVerifyOnly = $true'], teamsLines)
       }
     ]
     distribute: concat([

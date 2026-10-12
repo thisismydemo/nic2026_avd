@@ -12,6 +12,10 @@ One `fslogix-settings.json` serves the Azure VM, Azure Local VM and Hyper-V VM s
 
 `-Mode Production` (default) fails closed: a profile problem blocks sign-in (`PreventLoginWithFailure` / `PreventLoginWithTempProfile` = 1). `-Mode Rehearsal` sets both to 0 for diagnosis only; flip back before the session and check with the same mode you applied.
 
+## Cloud Cache (pattern B, design/avd/landing-zone.md 7.10)
+
+`Set-FslogixHostConfig.ps1 -CloudCacheProviderUnc <nearest>,<far>` writes `CCDLocations` (SMB providers in that order) for the profile and ODFC containers, removes `VHDLocations` (Learn: never both), and applies the `cloud_cache` values from `fslogix-settings.json` (`HealthyProvidersRequiredForRegister` 1, unregister timeout, lock retries, `ClearCacheOnLogoff`). Every host that serves those users must be switched the same way, nearest provider first. `Test-FslogixHostConfig.ps1` takes the same parameter. Not applied in the lab until the prerequisites in D-053 are cleared.
+
 ## Notes
 
 - A hard power-off of a session host leaves the SMB handle on the user's VHDX open until the SMB session times out, so a reconnect can report "profile in use". The operator-controlled fallback is `Close-AzStorageFileHandle -ShareName <share> -Path <user folder> -CloseAll`; it can disrupt a live user, so check for active sessions first.

@@ -413,6 +413,19 @@ module raHostpoolReaderArc 'br/public:avm/res/authorization/role-assignment/rg-s
   }
 }
 
+// Host-pool identity → Reader on the Azure Local cluster RG (other subscription), where the AVD on Azure Local session
+// hosts live (Learn: configure-managed-identity#assign-managed-identity-to-on-premises-session-hosts).
+module raHostpoolReaderAzl 'br/public:avm/res/authorization/role-assignment/rg-scope:0.1.1' = {
+  name: 'dep-${deployment().name}-ra-hp-azl'
+  scope: resourceGroup(subscription_id_azl, names.rg_azl_cluster)
+  params: {
+    principalId: hostpoolIdentity.outputs.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionIdOrName: 'Reader'
+    description: 'AVD host-pool identity reads the AVD on Azure Local session hosts (configure-managed-identity).'
+  }
+}
+
 var loginScopes = ['hosts', 'arc']
 
 module raUsersVmLogin 'br/public:avm/res/authorization/role-assignment/rg-scope:0.1.1' = [
@@ -479,6 +492,15 @@ module raAibNetwork 'br/public:avm/res/authorization/role-assignment/rg-scope:0.
     principalId: aibIdentity.outputs.principalId
     principalType: 'ServicePrincipal'
     roleDefinitionIdOrName: roleDefinitions.outputs.role_aib_network_id
+  }
+}
+
+module raAibIdentityOperator 'modules/aib-identity-role.bicep' = {
+  name: 'dep-${deployment().name}-ra-aib-identity'
+  scope: resourceGroup(names.rg_img)
+  params: {
+    identity_name: names.aib_identity
+    principal_id: aibIdentity.outputs.principalId
   }
 }
 

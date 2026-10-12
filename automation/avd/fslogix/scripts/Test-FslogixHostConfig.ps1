@@ -12,6 +12,8 @@ UNC root of the profiles share (no trailing backslash).
 UNC root of the Office data (ODFC) share (no trailing backslash).
 .PARAMETER Mode
 Production (default) or Rehearsal; check with the same mode that was applied.
+.PARAMETER CloudCacheProviderUnc
+Check the Cloud Cache configuration (same ordered providers as Set-FslogixHostConfig).
 .PARAMETER RegistryRoot
 Registry root; HKLM: for a real host, a HKCU: path for tests.
 .PARAMETER PassThru
@@ -23,13 +25,14 @@ param(
     [Parameter(Mandatory)][string]$ProfileShareUnc,
     [Parameter(Mandatory)][string]$OdfcShareUnc,
     [ValidateSet('Production', 'Rehearsal')][string]$Mode = 'Production',
+    [string[]]$CloudCacheProviderUnc = @(),
     [string]$RegistryRoot = 'HKLM:',
     [switch]$PassThru
 )
 Set-StrictMode -Version Latest
 if (-not (Get-Module -Name FslogixCommon)) { Import-Module (Join-Path $PSScriptRoot 'FslogixCommon.psm1') }
 $rows = @(Get-FslogixSettingPlan -SettingsPath $SettingsPath -ProfileShareUnc $ProfileShareUnc `
-        -OdfcShareUnc $OdfcShareUnc -Mode $Mode -RegistryRoot $RegistryRoot)
+        -OdfcShareUnc $OdfcShareUnc -Mode $Mode -RegistryRoot $RegistryRoot -CloudCacheProviderUnc $CloudCacheProviderUnc)
 $rows
 if (-not $PassThru -and @($rows | Where-Object Action -NE 'none').Count -gt 0) {
     throw 'FSLogix host registry settings differ from the requested configuration.'

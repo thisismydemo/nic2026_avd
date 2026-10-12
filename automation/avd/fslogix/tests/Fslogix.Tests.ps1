@@ -68,6 +68,23 @@ Describe 'Registry plan and application' -Skip:(-not $IsWindows) {
         $rows = @(& (Join-Path $scripts 'Test-FslogixHostConfig.ps1') -SettingsPath $settings -ProfileShareUnc $profileShare -OdfcShareUnc $odfcShare -RegistryRoot $registryRoot -PassThru)
         @($rows | Where-Object { $_.Action -eq 'set' -and $_.Name -eq 'VolumeType' }).Count | Should -Be 1
     }
+    It 'switches to Cloud Cache: CCDLocations in provider order, VHDLocations removed, then idempotent' {
+        $providers = @('\\sofs.example.test\Profiles', '\\files.example.test\profiles')
+        $common = @{ SettingsPath = $settings; ProfileShareUnc = $profileShare; OdfcShareUnc = $odfcShare; RegistryRoot = $registryRoot }
+        $plan = @(Get-FslogixSettingPlan @common -CloudCacheProviderUnc $providers)
+        @($plan | Where-Object { $_.Name -eq 'VHDLocations' -and $_.Action -eq 'remove' }).Count | Should -Be 2
+        $null = & (Join-Path $scripts 'Set-FslogixHostConfig.ps1') @common -CloudCacheProviderUnc $providers -SkipDefender -Execute
+        $profileKey = Get-ItemProperty -LiteralPath "$registryRoot\SOFTWARE\FSLogix\Profiles"
+        $profileKey.PSObject.Properties['VHDLocations'] | Should -BeNullOrEmpty
+        $profileKey.CCDLocations | Should -BeExactly 'type=smb,name="PROVIDER 1",connectionString=\\sofs.example.test\Profiles;type=smb,name="PROVIDER 2",connectionString=\\files.example.test\profiles'
+        $profileKey.HealthyProvidersRequiredForRegister | Should -Be 1
+        @(& (Join-Path $scripts 'Test-FslogixHostConfig.ps1') @common -CloudCacheProviderUnc $providers) | Where-Object Action -NE 'none' | Should -BeNullOrEmpty
+        # back to the standard container so the later tests see the default layout
+        $null = & (Join-Path $scripts 'Set-FslogixHostConfig.ps1') @common -SkipDefender -Execute
+        foreach ($key in 'SOFTWARE\FSLogix\Profiles', 'SOFTWARE\Policies\FSLogix\ODFC') {
+            Remove-ItemProperty -LiteralPath "$registryRoot\$key" -Name CCDLocations -ErrorAction SilentlyContinue
+        }
+    }
     It 'selects rehearsal and production prevention values' {
         foreach ($mode in @('Production', 'Rehearsal')) {
             $rows = @(Get-FslogixSettingPlan -SettingsPath $settings -ProfileShareUnc $profileShare -OdfcShareUnc $odfcShare -Mode $mode -RegistryRoot $registryRoot)

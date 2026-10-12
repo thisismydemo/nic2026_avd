@@ -315,6 +315,34 @@ module nsgImgBuild 'br/public:avm/res/network/network-security-group:0.5.3' = {
         }
       }
       {
+        name: 'AllowImageBuilderWinRmInbound'
+        properties: {
+          priority: 110
+          direction: 'Inbound'
+          access: 'Allow'
+          protocol: 'Tcp'
+          sourceAddressPrefix: avd_subnets.imgbuild
+          sourcePortRange: '*'
+          destinationAddressPrefix: avd_subnets.imgbuild
+          destinationPortRange: '5986'
+          description: 'Image Builder proxy to Windows build VM within the image-build subnet'
+        }
+      }
+      {
+        name: 'AllowImageBuilderPrivateLinkProxyInbound'
+        properties: {
+          priority: 120
+          direction: 'Inbound'
+          access: 'Allow'
+          protocol: 'Tcp'
+          sourceAddressPrefix: avd_subnets.imgbuild
+          sourcePortRange: '*'
+          destinationAddressPrefix: avd_subnets.imgbuild
+          destinationPortRange: '60000'
+          description: 'Image Builder Private Link NAT source to proxy within the image-build subnet'
+        }
+      }
+      {
         name: 'DenyAllInbound'
         properties: {
           priority: 4000

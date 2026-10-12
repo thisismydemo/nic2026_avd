@@ -7,6 +7,17 @@ param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+Describe 'Azure Local Arc Entra join required settings' {
+    It 'explicitly supplies empty mdmId in both provider extension blocks' -ForEach @(
+        @{ RelativePath = 'bicep/modules/host.bicep'; Pattern = "(?s)resource entra .*?settings:\s*\{\s*mdmId:\s*''\s*\}" }
+        @{ RelativePath = 'terraform/main.tf'; Pattern = '(?s)resource "azapi_resource" "entra".*?settings\s*=\s*\{\s*mdmId\s*=\s*""\s*\}' }
+    ) {
+        $source = Get-Content (Join-Path (Split-Path -Parent $PSScriptRoot) $RelativePath) -Raw
+        $source | Should -Match $Pattern
+        ($source -replace 'mdmId\s*[:=]\s*(?:""|\x27\x27)', '') | Should -Not -Match $Pattern
+    }
+}
+
 BeforeAll {
     $script:root = Split-Path -Parent $PSScriptRoot
     $script:register = Join-Path $script:root 'scripts/Register-AvdSessionHostsAzureLocal.ps1'
@@ -79,13 +90,24 @@ Describe 'Manifest and infrastructure contracts' {
         $tf = Get-Content (Join-Path $script:root 'terraform/main.tf') -Raw
         $tfVars = Get-Content (Join-Path $script:root 'terraform/variables.tf') -Raw
         foreach ($resource in @(
-                'Microsoft.HybridCompute/machines@2025-06-01',
-                'Microsoft.AzureStackHCI/networkInterfaces@2024-01-01',
-                'Microsoft.AzureStackHCI/virtualMachineInstances@2024-01-01')) {
+                'Microsoft.HybridCompute/machines@2025-01-13',
+                'Microsoft.AzureStackHCI/networkInterfaces@2026-04-01-preview',
+                'Microsoft.AzureStackHCI/virtualMachineInstances@2026-04-01-preview')) {
             $hostFile | Should -Match ([regex]::Escape($resource))
             $tf | Should -Match ([regex]::Escape($resource))
         }
         $bicep | Should -Match 'range\(0, host_count\)'
+        # The cluster accepts only 2025-09-01-preview, 2026-02-01-preview or 2026-04-01-preview for VM management.
+        foreach ($text in @($hostFile, $tf)) {
+            $text | Should -Not -Match 'Microsoft\.AzureStackHCI/\w+@(?!2025-09-01-preview|2026-02-01-preview|2026-04-01-preview)'
+        }
+        # D-050: AD join through JsonADDomainExtension with the password only in protected settings; explicit storage path.
+        foreach ($text in @($hostFile, $tf)) {
+            $text | Should -Match 'JsonADDomainExtension'
+            $text | Should -Match 'vmConfigStoragePathId'
+        }
+        $hostFile | Should -Match '(?s)protectedSettings:\s*\{\s*Password: domainJoinPassword'
+        $hostFile | Should -Match '(?s)@secure\(\)\s*param domainJoinPassword'
         foreach ($text in @($bicep, $hostFile, $tf, $tfVars)) {
         }
         foreach ($text in @($bicep, $hostFile)) {

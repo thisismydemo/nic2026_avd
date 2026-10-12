@@ -20,7 +20,7 @@
 .PARAMETER HostPoolName
     Name of the host pool (output hostpool_names).
 .PARAMETER ExpirationHours
-    Token lifetime in hours, from 1 to 24. Defaults to 2.
+    Token lifetime in hours, from 1 to 24. Defaults to 2. A 30-second grace is added so a one-hour token is not rejected by the service's minimum.
 .PARAMETER Revoke
     Remove the host pool's existing registration information instead of generating a token.
 .PARAMETER Execute
@@ -96,7 +96,8 @@ if ($Revoke) {
     }
 }
 else {
-    $expiry = (Get-Date).ToUniversalTime().AddHours($ExpirationHours)
+    # The service rejects an expiry under one hour from *its* clock; the grace keeps -ExpirationHours 1 valid after request latency.
+    $expiry = (Get-Date).ToUniversalTime().AddHours($ExpirationHours).AddSeconds(30)
 
     if ($PSCmdlet.ShouldProcess($HostPoolName, 'Generate registration token')) {
         $plainTextToken = (New-AzWvdRegistrationInfo `

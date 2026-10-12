@@ -13,6 +13,10 @@ UNC root of the profiles share (no trailing backslash).
 UNC root of the Office data (ODFC) share (no trailing backslash).
 .PARAMETER Mode
 Production (default) fails closed on a profile problem; Rehearsal turns the two PreventLogin settings off for diagnosis.
+.PARAMETER CloudCacheProviderUnc
+Pattern B (design/avd/landing-zone.md 7.10): ordered SMB providers for Cloud Cache, nearest first (Azure Local and
+Hybrid hosts: the SOFS share, then Azure Files; Azure hosts: Azure Files, then the SOFS). CCDLocations replaces
+VHDLocations (the old value is removed). Use only when every host that serves those users is switched the same way.
 .PARAMETER RegistryRoot
 Registry root; HKLM: for a real host, a HKCU: path for tests.
 .PARAMETER SkipDefender
@@ -26,6 +30,7 @@ param(
     [Parameter(Mandatory)][string]$ProfileShareUnc,
     [Parameter(Mandatory)][string]$OdfcShareUnc,
     [ValidateSet('Production', 'Rehearsal')][string]$Mode = 'Production',
+    [string[]]$CloudCacheProviderUnc = @(),
     [string]$RegistryRoot = 'HKLM:',
     [switch]$SkipDefender,
     [switch]$Execute
@@ -33,9 +38,9 @@ param(
 Set-StrictMode -Version Latest
 if (-not (Get-Module -Name FslogixCommon)) { Import-Module (Join-Path $PSScriptRoot 'FslogixCommon.psm1') }
 $rows = @(Get-FslogixSettingPlan -SettingsPath $SettingsPath -ProfileShareUnc $ProfileShareUnc `
-        -OdfcShareUnc $OdfcShareUnc -Mode $Mode -RegistryRoot $RegistryRoot)
+        -OdfcShareUnc $OdfcShareUnc -Mode $Mode -RegistryRoot $RegistryRoot -CloudCacheProviderUnc $CloudCacheProviderUnc)
 if ($Execute) {
-    if (-not $IsWindows) { throw 'Applying host configuration requires Windows.' }
+    if (-not (Test-FslogixWindows)) { throw 'Applying host configuration requires Windows.' }
     if ($RegistryRoot -ieq 'HKLM:') {
         $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
         $principal = [Security.Principal.WindowsPrincipal]::new($identity)
@@ -51,6 +56,9 @@ foreach ($row in $rows) {
         if (-not (Test-Path -LiteralPath $row.Path)) { $null = New-Item -Path $row.Path -Force }
         $null = New-ItemProperty -LiteralPath $row.Path -Name $row.Name -Value $row.Desired `
             -PropertyType $row.Type -Force -ErrorAction Stop
+    }
+    if ($Execute -and $row.Action -eq 'remove' -and $PSCmdlet.ShouldProcess("$($row.Path)\$($row.Name)", 'Remove registry value')) {
+        Remove-ItemProperty -LiteralPath $row.Path -Name $row.Name -ErrorAction Stop
     }
 }
 if (-not $SkipDefender) {

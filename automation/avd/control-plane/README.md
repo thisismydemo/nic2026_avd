@@ -43,3 +43,24 @@ Authored by `gpt-6-sol` via the HCS Foundry gateway; reviewed by `deepseek-v4-pr
 - Terraform: if `azapi` 2.12 rejects `Microsoft.DesktopVirtualization/hostPools@2025-11-01-preview` locally, set `schema_validation_enabled = false` on `azapi_resource.host_pool` (the service still validates).
 - `az monitor diagnostic-settings categories list --resource <scaling plan id>` to confirm `allLogs` is accepted for the scaling plan.
 - The first run may need a second apply if RBAC propagation for the Power On Off role lags behind the scaling-plan association.
+
+## Registration-token runtime configuration
+
+`registration_token_ttl_hours` remains in the approved AVD environment configuration. It is a runtime setting, so it is excluded from IaC parameters. Token creation remains a separate, explicit join-time operation that returns a SecureString in memory.
+
+After loading the approved configuration and deployment outputs, pass its lifetime explicitly instead of relying on the token script's two-hour default:
+
+```powershell
+$cfg = Get-NIC26Config -Scope avd
+$registration = .\scripts\New-AvdRegistrationToken.ps1 -SubscriptionId $cfg.values.subscription_id_avd -ResourceGroupName $outputs.hostpool_rg -HostPoolName $outputs.hostpool_names.azure -ExpirationHours $cfg.values.registration_token_ttl_hours -Execute
+```
+
+Pass the returned SecureString directly to session-host protected settings. Do not print it, save it, or include it in a transcript. This control-plane deployment creates no registration tokens.
+
+The scaling schedule maps canonical `ramp_up_load_balancing`, `peak_load_balancing`, `ramp_down_load_balancing` and `off_peak_load_balancing` fields to the Azure API and Terraform provider algorithm properties. Ramp-down uses `ZeroSessions`, matching the existing example policy: hosts stop after sessions are gone. The canonical environment schema does not expose a stop-host-policy field; Bicep and Terraform use this same explicit default.
+
+The optional scaling exclusion tag defaults to an empty string when omitted from the canonical environment, so no tag excludes hosts from the schedule. Both implementations apply the same default.
+
+Canonical schedule start times remain `HH:mm` strings. Bicep maps each of the four times to integer `hour`/`minute` objects required by [the 2025-10-10 scaling-plan API](https://learn.microsoft.com/en-us/azure/templates/microsoft.desktopvirtualization/2025-10-10/scalingplans); Terraform passes the strings directly to its provider.
+
+Power-management autoscale grants the existing shared host-pool managed identity the subscription-scope Desktop Virtualization Power On Off Contributor role before the scaling plan is created, as required by [Microsoft's autoscale prerequisites](https://learn.microsoft.com/en-us/azure/virtual-desktop/autoscale-create-assign-scaling-plan). The tenant-specific optional Azure Virtual Desktop service-principal input remains separate; no managed-identity object ID is substituted into it. Role propagation can delay scaling-plan acceptance after a first assignment.

@@ -17,6 +17,12 @@ Resource group of the host pool.
 Host pool the machines join.
 .PARAMETER MachineName
 Arc machine names, processed in order; the first failure stops the run.
+.PARAMETER HostPoolSubscriptionId
+Subscription of the host pool when it differs from the Arc machines' subscription (AVD landing zone vs Azure Local
+landing zone). Defaults to SubscriptionId.
+.PARAMETER SessionHostName
+Guest computer names in the same order as MachineName (the host pool lists session hosts by computer FQDN, not by
+Arc machine name). Defaults to MachineName.
 .PARAMETER TokenScriptPath
 Path to the control-plane New-AvdRegistrationToken.ps1.
 .PARAMETER ExpirationHours
@@ -33,6 +39,8 @@ param(
     [Parameter(Mandatory)][string]$HostPoolResourceGroup,
     [Parameter(Mandatory)][string]$HostPoolName,
     [Parameter(Mandatory)][string[]]$MachineName,
+    [string]$HostPoolSubscriptionId = '',
+    [string[]]$SessionHostName = @(),
     [Parameter(Mandatory)][string]$TokenScriptPath,
     [ValidateRange(1, 24)][int]$ExpirationHours = 2,
     [ValidateRange(1, 1440)][int]$WaitMinutes = 20,
@@ -60,6 +68,9 @@ if (-not (Get-Command Start-SessionHostSleep -ErrorAction SilentlyContinue)) {
 $installer = @'
 param($RegistrationToken, $AgentUri, $BootloaderUri)
 $ErrorActionPreference = 'Stop'
+# Idempotent re-run: an agent that is installed and registered is left alone (a second msiexec /i only reconfigures and fails).
+$agentState = Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\RDInfraAgent' -ErrorAction SilentlyContinue
+if ($agentState -and $agentState.PSObject.Properties['IsRegistered'] -and $agentState.IsRegistered -eq 1 -and (Get-Service -Name RDAgentBootLoader -ErrorAction SilentlyContinue)) { return }
 $agentPath = Join-Path $env:TEMP ("avd-agent-{0}.msi" -f [guid]::NewGuid())
 $bootloaderPath = Join-Path $env:TEMP ("avd-bootloader-{0}.msi" -f [guid]::NewGuid())
 try {
@@ -84,9 +95,13 @@ if (-not $Execute) {
 
 if (-not $PSCmdlet.ShouldProcess(($MachineName -join ', '), 'Register AVD agents through Arc Run Command')) { return }
 if (-not (Test-Path -LiteralPath $TokenScriptPath -PathType Leaf)) { throw 'Token script does not exist.' }
-Set-AzContext -WhatIf:$false -SubscriptionId $SubscriptionId | Out-Null
+Set-AzContext -WhatIf:$false -SubscriptionId $SubscriptionId -Tenant (Get-AzContext).Tenant.Id | Out-Null
+if (-not $HostPoolSubscriptionId) { $HostPoolSubscriptionId = $SubscriptionId }
+if ($SessionHostName.Count -gt 0 -and $SessionHostName.Count -ne $MachineName.Count) { throw 'SessionHostName must have one entry per MachineName.' }
 
-foreach ($machine in $MachineName) {
+for ($index = 0; $index -lt $MachineName.Count; $index++) {
+    $machine = $MachineName[$index]
+    $computer = if ($SessionHostName.Count -gt 0) { $SessionHostName[$index] } else { $machine }
     $arc = Get-AzConnectedMachine -Name $machine -ResourceGroupName $ResourceGroupName
     if ($null -eq $arc -or $arc.Status -ne 'Connected') { throw "Machine $machine is not Connected." }
 
@@ -95,7 +110,7 @@ foreach ($machine in $MachineName) {
     $created = $false
     $state = 'Unknown'
     try {
-        $registration = & $TokenScriptPath -SubscriptionId $SubscriptionId `
+        $registration = & $TokenScriptPath -SubscriptionId $HostPoolSubscriptionId `
             -ResourceGroupName $HostPoolResourceGroup -HostPoolName $HostPoolName `
             -ExpirationHours $ExpirationHours -Execute
         if ($null -eq $registration -or $registration.Token -isnot [securestring]) {
@@ -132,8 +147,9 @@ foreach ($machine in $MachineName) {
         $exitCode = $null
         $maximumPolls = $WaitMinutes * 12
         for ($poll = 0; $poll -lt $maximumPolls; $poll++) {
-            $result = Get-AzConnectedMachineRunCommand -MachineName $machine -ResourceGroupName $ResourceGroupName `
-                -RunCommandName $runCommandName -Expand 'instanceView'
+            # Az.ConnectedMachine: -Expand exists only on the List parameter set, so list with the instance view and pick.
+            $result = Get-AzConnectedMachineRunCommand -MachineName $machine -ResourceGroupName $ResourceGroupName -Expand 'instanceView' |
+                Where-Object { -not $_.PSObject.Properties['Name'] -or $_.Name -eq $runCommandName } | Select-Object -First 1
             $state = [string]$result.InstanceViewExecutionState
             $exitCode = $result.InstanceViewExitCode
             if ($state -in @('Failed', 'Canceled', 'TimedOut')) { break }
@@ -157,8 +173,8 @@ foreach ($machine in $MachineName) {
     $available = $false
     $maximumPolls = $WaitMinutes * 12
     for ($poll = 0; $poll -lt $maximumPolls -and -not $available; $poll++) {
-        foreach ($hostEntry in @(Get-AzWvdSessionHost -ResourceGroupName $HostPoolResourceGroup -HostPoolName $HostPoolName)) {
-            if (($hostEntry.Name -eq "$HostPoolName/$machine" -or $hostEntry.Name -like "$HostPoolName/$machine.*") -and
+        foreach ($hostEntry in @(Get-AzWvdSessionHost -SubscriptionId $HostPoolSubscriptionId -ResourceGroupName $HostPoolResourceGroup -HostPoolName $HostPoolName)) {
+            if (($hostEntry.Name -eq "$HostPoolName/$computer" -or $hostEntry.Name -like "$HostPoolName/$computer.*") -and
                 $hostEntry.Status -eq 'Available') { $available = $true; break }
         }
         if (-not $available) { Start-SessionHostSleep -Seconds 5 }

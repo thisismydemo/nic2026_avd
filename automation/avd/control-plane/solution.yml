@@ -27,7 +27,6 @@ inputs:
   - { name: scaling_plan,         type: map,    description: "Scaling plan: time_zone, assigned_pools, exclusion_tag?, schedules[] (design §6.1).", required: true, source: environment }
   - { name: enable_scaling_plan,  type: bool,   description: "Deploy the scaling plan for the Azure pool. ADDED flag; not yet in avd.environment.schema.json.", required: false, default: true, source: environment }
   - { name: workspace_friendly_name, type: string, description: "Workspace friendly name shown in Windows App (design §6.1). ADDED; not yet in the schema.", required: false, default: "Infinite Improbability Corp", source: environment }
-  - { name: registration_token_ttl_hours, type: int, description: "Registration token lifetime used by scripts/New-AvdRegistrationToken.ps1 (K-7, <= 24 h). Not used by IaC.", required: true, source: environment }
 
   # --- identity and monitoring (design §5.3, §9.2) ---
   - { name: group_object_ids,     type: map,    description: "Object ids of the AVD groups (schema keys avd_azure, avd_azl, avd_hybrid, ...); the three realm groups get Desktop Virtualization User on their application group.", required: true, source: environment }

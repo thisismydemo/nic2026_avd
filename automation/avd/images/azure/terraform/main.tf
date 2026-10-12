@@ -55,7 +55,7 @@ resource "azapi_resource" "image_template" {
       customize = [
         { type = "PowerShell", name = "InstallFslogix", runElevated = true, runAsSystem = true, inline = local.fslogix_lines },
         { type = "WindowsRestart", restartTimeout = "10m" },
-        { type = "PowerShell", name = "InstallTeamsWebRtc", runElevated = true, runAsSystem = true, inline = local.teams_lines },
+        { type = "PowerShell", name = "InstallTeamsWebRtc", runElevated = true, runAsSystem = true, inline = concat(["$WebRtcRetainForVerification = $true"], local.teams_lines) },
         { type = "PowerShell", name = "SetShortpathListener", runElevated = true, runAsSystem = true, inline = local.shortpath_lines },
         { type = "PowerShell", name = "SetDefenderExclusions", runElevated = true, runAsSystem = true, inline = local.defender_lines },
         { type = "PowerShell", name = "InvokeVdot", runElevated = true, runAsSystem = true, inline = local.vdot_lines },
@@ -66,7 +66,8 @@ resource "azapi_resource" "image_template" {
           filters        = ["exclude:$_.Title -like '*Preview*'", "include:$true"]
           updateLimit    = 40
         },
-        { type = "WindowsRestart", restartTimeout = "10m" }
+        { type = "WindowsRestart", restartTimeout = "10m" },
+        { type = "PowerShell", name = "VerifyTeamsWebRtc", runElevated = true, runAsSystem = true, inline = concat(["$WebRtcVerifyOnly = $true"], local.teams_lines) }
       ]
       distribute = concat(
         [{

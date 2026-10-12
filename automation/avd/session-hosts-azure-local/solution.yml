@@ -14,18 +14,24 @@ inputs:
   - { name: resource_group_name, type: string, description: "Resource group that receives the session-host Arc machines (Terraform; Bicep deploys into the group chosen by the wrapper).", required: true, source: generated }
   - { name: tags, type: map, description: "Resource tags.", required: true, source: environment }
   - { name: names, type: map, description: "Generated resource-name catalog.", required: true, source: generated }
-  - { name: host_count, type: int, description: "Number of Azure Local session hosts; supported range is 1-2.", required: true, source: environment, path: host_pools.azl.session_host_count }
+  - { name: host_count, type: int, description: "Number of Azure Local session hosts; supported range is 1-3 (a third host only for the GPU spec).", required: true, source: environment, path: host_pools.azl.session_host_count }
   - { name: vcpu, type: int, description: "Virtual processors per host (design: 4).", required: false, default: 4, source: environment }
   - { name: memory_mb, type: int, description: "Memory in MB per host (design: 16 GB).", required: false, default: 16384, source: environment }
   - { name: custom_location_id, type: string, description: "Custom-location resource ID of the cluster (lz-azure-local / cluster-deploy output).", required: true, source: generated }
   - { name: logical_network_id, type: string, description: "Logical-network resource ID for the AVD hosts (cluster-configure output).", required: true, source: generated }
   - { name: image_id, type: string, description: "Resource ID of the image already on the cluster (avd-images-azure-local output).", required: true, source: generated }
   - { name: dcr_id, type: string, description: "AVD Insights DCR resource ID from lz-avd.", required: true, source: generated }
-  - { name: entra_join_extension, type: bool, description: "Install the AADLoginForWindows Arc extension (flagged first-day test on Azure Local VMs).", required: false, default: true, source: environment }
+  - { name: storage_path_ids, type: list, description: "Storage path resource IDs, one per host in host order (D-049).", required: true, source: generated }
+  - { name: join_type, type: string, description: "AD (JsonADDomainExtension, D-050), Entra (AADLoginForWindows) or None.", required: false, default: AD, source: environment, path: azl_session_hosts.join_type }
+  - { name: domain_fqdn, type: string, description: "AD DNS domain the hosts join (join_type AD).", required: false, source: environment, path: azl_session_hosts.domain_fqdn }
+  - { name: domain_ou_path, type: string, description: "OU distinguished name for the computer accounts (join_type AD).", required: false, source: environment, path: azl_session_hosts.domain_ou_path }
+  - { name: gpu_dda_counts, type: list, description: "GPU DDA devices per host in host order.", required: false, source: environment, path: azl_session_hosts.gpu_dda_counts }
   - { name: enable_monitoring, type: bool, description: "Install Azure Monitor Agent and associate the DCR.", required: false, default: true, source: environment }
   - { name: hostpool_name, type: string, description: "Host-pool name from avd-control-plane; used only by the registration script.", required: true, source: generated }
   - { name: hostpool_rg, type: string, description: "Host-pool resource group from avd-control-plane; used only by the registration script.", required: true, source: generated }
   - { name: local_admin_username_secret, type: secret-ref, description: "keyvault:// reference for the logical secret avd-sessionhost-local-admin; resolved in memory by scripts/Invoke-SessionHostsAzureLocalDeploy.ps1.", required: true, source: keyvault, path: secret_refs.sessionhost_local_admin_username }
+  - { name: domain_join_username_secret, type: secret-ref, description: "keyvault:// reference of the delegated join account (join_type AD).", required: false, source: keyvault, path: azl_session_hosts.domain_join_username_secret }
+  - { name: domain_join_password_secret, type: secret-ref, description: "keyvault:// reference of the join account password (join_type AD); resolved in memory.", required: false, source: keyvault, path: azl_session_hosts.domain_join_password_secret }
   - { name: local_admin_password_secret, type: secret-ref, description: "keyvault:// reference for the logical secret avd-sessionhost-local-admin; resolved in memory by scripts/Invoke-SessionHostsAzureLocalDeploy.ps1.", required: true, source: keyvault, path: secret_refs.sessionhost_local_admin_password }
 
 outputs:

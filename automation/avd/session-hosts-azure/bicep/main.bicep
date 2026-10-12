@@ -41,7 +41,12 @@ param hostpool_name string
 @description('Used by the post-deployment registration script, not by IaC.')
 param hostpool_rg string
 
-
+// The two *_secret parameters hold keyvault:// REFERENCES (vault and secret names, contract §3), never values;
+// they are consumed by the deploy wrapper and accepted here only so the generated parameter file round-trips.
+#disable-next-line secure-secrets-in-params no-unused-params
+param local_admin_username_secret string = ''
+#disable-next-line secure-secrets-in-params no-unused-params
+param local_admin_password_secret string = ''
 
 @secure()
 param adminUsername string

@@ -27,8 +27,8 @@ param(
     [switch]$Execute
 )
 Set-StrictMode -Version Latest
-if (-not $IsWindows) { throw 'Share permission management requires Windows.' }
 if (-not (Get-Module -Name FslogixCommon)) { Import-Module (Join-Path $PSScriptRoot 'FslogixCommon.psm1') }
+if (-not (Test-FslogixWindows)) { throw 'Share permission management requires Windows.' }
 $rows = @(Get-FslogixAclPlan -ProfileShareUnc $ProfileShareUnc -OdfcShareUnc $OdfcShareUnc `
         -UsersGroupObjectId $UsersGroupObjectId -AdminsGroupObjectId $AdminsGroupObjectId)
 $module = Get-Module FslogixCommon

@@ -52,5 +52,15 @@
       "frxsvc.exe",
       "frxccds.exe"
     ]
+  },
+  "cloud_cache": {
+    "HealthyProvidersRequiredForRegister": 1,
+    "HealthyProvidersRequiredForUnregister": 1,
+    "CcdUnregisterTimeout": 300,
+    "ClearCacheOnLogoff": 1,
+    "LockedRetryCount": 3,
+    "LockedRetryInterval": 15,
+    "ReAttachIntervalSeconds": 15,
+    "ReAttachRetryCount": 3
   }
 }

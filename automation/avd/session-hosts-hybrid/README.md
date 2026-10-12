@@ -4,6 +4,10 @@ AVD Hybrid realm: two plain **Generation 2 Hyper-V VMs** on the Azure Local clus
 
 Authored by gpt-6-sol via the HCS Foundry gateway; external review is recorded in `design/shared/verification-log.md`. Nothing here is deployed.
 
+## One command from the environment file (D-050: AD join)
+
+`scripts/Invoke-HybridHostBuild.ps1 -EnvironmentFile <environment/avd/environment.yml> [-VmName nic26-avd-hv01] -Execute` builds each VM in `hybrid.vms` idempotently from the operator workstation: copies the Windows 11 Enterprise single-session master VHDX (`hybrid.master_vhdx`), writes the answer file, creates the Generation 2 VM (Secure Boot, vTPM, static MAC, access VLAN on `ComputeSwitch(compute)`), makes it a clustered role (falls back to an unclustered VM with a warning if the remote session cannot create the role; step 5 then clusters it through a one-time scheduled task on the task node that runs as the cluster administrator from the vault and removes itself, also on its own with `-Stage ClusterRoles [-TaskNode <address>]`), AD-joins it into `hybrid.domain_ou_path` with the delegated join account, installs and connects the Arc agent with the operator's short-lived access token (no onboarding service principal exists in this lab), merges the tags and registers it with `Register-HybridHosts.ps1`. The Entra provisioning-package path below stays for an Entra-only variant.
+
 ## What is where
 
 | Part | Files | Runs |

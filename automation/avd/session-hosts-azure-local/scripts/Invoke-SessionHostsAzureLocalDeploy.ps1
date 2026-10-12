@@ -20,10 +20,15 @@ Bicep: ARM JSON parameters file. Terraform: tfvars JSON file.
 keyvault:// reference of the local administrator user name.
 .PARAMETER AdminPasswordRef
 keyvault:// reference of the local administrator password.
+.PARAMETER DomainJoinUsernameRef
+keyvault:// reference of the delegated AD join account (join_type AD, D-050). Optional.
+.PARAMETER DomainJoinPasswordRef
+keyvault:// reference of the AD join account password; resolved in memory and passed only as a secure parameter.
 .PARAMETER Execute
 Apply the change. Without it only a What-If / plan runs.
 #>
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingPlainTextForPassword', 'AdminPasswordRef', Justification = 'A keyvault:// reference (a name), not a password; the value is resolved in memory.')]
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingPlainTextForPassword', 'DomainJoinPasswordRef', Justification = 'A keyvault:// reference (a name), not a password; the value is resolved in memory.')]
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingConvertToSecureStringWithPlainText', '', Justification = 'The value was just resolved from Key Vault in memory; New-AzResourceGroupDeployment needs a SecureString for the template @secure() parameters.')]
 [CmdletBinding(SupportsShouldProcess)]
 param(
@@ -33,6 +38,8 @@ param(
     [Parameter(Mandatory)][string]$ParameterFile,
     [Parameter(Mandatory)][ValidatePattern('^keyvault://')][string]$AdminUsernameRef,
     [Parameter(Mandatory)][ValidatePattern('^keyvault://')][string]$AdminPasswordRef,
+    [ValidatePattern('^$|^keyvault://')][string]$DomainJoinUsernameRef = '',
+    [ValidatePattern('^$|^keyvault://')][string]$DomainJoinPasswordRef = '',
     [switch]$Execute
 )
 
@@ -52,9 +59,13 @@ function ConvertFrom-ResolvedSecret {
 
 $user = $null
 $password = $null
+$joinUser = ''
+$joinPassword = ''
 try {
     $user = ConvertFrom-ResolvedSecret (Resolve-NIC26KeyVaultRef -Ref $AdminUsernameRef)
     $password = ConvertFrom-ResolvedSecret (Resolve-NIC26KeyVaultRef -Ref $AdminPasswordRef)
+    if ($DomainJoinUsernameRef) { $joinUser = ConvertFrom-ResolvedSecret (Resolve-NIC26KeyVaultRef -Ref $DomainJoinUsernameRef) }
+    if ($DomainJoinPasswordRef) { $joinPassword = ConvertFrom-ResolvedSecret (Resolve-NIC26KeyVaultRef -Ref $DomainJoinPasswordRef) }
     $file = (Resolve-Path -LiteralPath $ParameterFile).Path
 
     if ($Mode -eq 'Bicep') {
@@ -65,7 +76,9 @@ try {
             adminUsername         = (ConvertTo-SecureString $user -AsPlainText -Force)
             adminPassword         = (ConvertTo-SecureString $password -AsPlainText -Force)
         }
-        Set-AzContext -WhatIf:$false -SubscriptionId $SubscriptionId | Out-Null
+        if ($joinUser) { $arguments['domainJoinUsername'] = (ConvertTo-SecureString $joinUser -AsPlainText -Force) }
+        if ($joinPassword) { $arguments['domainJoinPassword'] = (ConvertTo-SecureString $joinPassword -AsPlainText -Force) }
+        Set-AzContext -WhatIf:$false -SubscriptionId $SubscriptionId -Tenant (Get-AzContext).Tenant.Id | Out-Null
         if (-not $Execute) {
             New-AzResourceGroupDeployment @arguments -WhatIf
         }
@@ -87,6 +100,8 @@ try {
             # ProcessStartInfo.Environment affects only the child process, never this one.
             $start.Environment['TF_VAR_local_admin_username'] = $user
             $start.Environment['TF_VAR_local_admin_password'] = $password
+            if ($joinUser) { $start.Environment['TF_VAR_domain_join_username'] = $joinUser }
+            if ($joinPassword) { $start.Environment['TF_VAR_domain_join_password'] = $joinPassword }
             $start.Environment['TF_VAR_resource_group_name'] = $ResourceGroupName
             $start.Environment['TF_VAR_subscription_id_azl'] = $SubscriptionId
             $process = [System.Diagnostics.Process]::Start($start)
@@ -108,4 +123,6 @@ try {
 finally {
     $user = $null
     $password = $null
+    $joinUser = $null
+    $joinPassword = $null
 }

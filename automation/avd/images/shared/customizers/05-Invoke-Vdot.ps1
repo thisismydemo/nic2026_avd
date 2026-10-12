@@ -5,7 +5,7 @@ Set-StrictMode -Version Latest
 
 $archiveUri = '{{vdot_archive_uri}}'
 $expectedHash = '{{vdot_archive_sha256}}'
-if (-not $archiveUri -or $archiveUri.Contains('{{')) {
+if (-not $archiveUri -or $archiveUri.Contains(([string][char]123 + [char]123))) {
     Write-Output 'VDOT skipped'
     exit 0
 }

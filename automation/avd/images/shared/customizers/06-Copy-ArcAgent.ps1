@@ -5,7 +5,7 @@ Set-StrictMode -Version Latest
 
 $agentUri = '{{arc_agent_uri}}'
 $agentDirectory = '{{arc_agent_directory}}'
-if (-not $agentUri -or $agentUri.Contains('{{') -or -not $agentDirectory -or $agentDirectory.Contains('{{')) {
+if (-not $agentUri -or $agentUri.Contains(([string][char]123 + [char]123)) -or -not $agentDirectory -or $agentDirectory.Contains(([string][char]123 + [char]123))) {
     throw 'Arc agent URI and installer directory must be supplied.'
 }
 

@@ -9,7 +9,7 @@ $preferences = Get-MpPreference
 
 foreach ($entry in ($rawPaths -split ';')) {
     $candidate = $entry.Trim()
-    if (-not $candidate -or $candidate.Contains('{{') -or $candidate.StartsWith('\\')) {
+    if (-not $candidate -or $candidate.Contains(([string][char]123 + [char]123)) -or $candidate.StartsWith('\\')) {
         continue
     }
 
@@ -20,7 +20,7 @@ foreach ($entry in ($rawPaths -split ';')) {
 
 foreach ($entry in ($rawProcesses -split ';')) {
     $candidate = $entry.Trim()
-    if (-not $candidate -or $candidate.Contains('{{') -or $candidate.StartsWith('\\')) {
+    if (-not $candidate -or $candidate.Contains(([string][char]123 + [char]123)) -or $candidate.StartsWith('\\')) {
         continue
     }
 

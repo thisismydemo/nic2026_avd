@@ -34,6 +34,32 @@ function Get-FslogixAclRule {
     }
 }
 
+function Test-FslogixWindows {
+    # $IsWindows does not exist in Windows PowerShell 5.1 (the engine Run Command uses on a session host) and StrictMode would reject it.
+    param()
+    return [System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT
+}
+
+function ConvertTo-FslogixHashtable {
+    # ConvertFrom-Json -AsHashtable is PowerShell 6+; this keeps the plan builder usable under Windows PowerShell 5.1 on a session host.
+    param([AllowNull()]$InputObject)
+    if ($null -eq $InputObject) { return $null }
+    if ($InputObject -is [System.Collections.IDictionary]) {
+        $table = [ordered]@{}
+        foreach ($key in $InputObject.Keys) { $table[[string]$key] = ConvertTo-FslogixHashtable $InputObject[$key] }
+        return $table
+    }
+    if ($InputObject -is [System.Management.Automation.PSCustomObject]) {
+        $table = [ordered]@{}
+        foreach ($property in $InputObject.PSObject.Properties) { $table[$property.Name] = ConvertTo-FslogixHashtable $property.Value }
+        return $table
+    }
+    if ($InputObject -is [array]) {
+        return @($InputObject | ForEach-Object { ConvertTo-FslogixHashtable $_ })
+    }
+    return $InputObject
+}
+
 function Get-FslogixMpPreference {
     param()
     return Get-MpPreference -ErrorAction Stop
@@ -62,16 +88,20 @@ function Get-FslogixSettingPlan {
         [Parameter(Mandatory)][string]$ProfileShareUnc,
         [Parameter(Mandatory)][string]$OdfcShareUnc,
         [ValidateSet('Production', 'Rehearsal')][string]$Mode = 'Production',
-        [string]$RegistryRoot = 'HKLM:'
+        [string]$RegistryRoot = 'HKLM:',
+        # Cloud Cache (pattern B, design/avd/landing-zone.md 7.10): ordered SMB providers, nearest first. When given,
+        # CCDLocations replaces VHDLocations for the profile and ODFC containers (Learn: both must never be present).
+        [string[]]$CloudCacheProviderUnc = @()
     )
     Assert-FslogixUnc $ProfileShareUnc
     Assert-FslogixUnc $OdfcShareUnc
+    foreach ($provider in $CloudCacheProviderUnc) { Assert-FslogixUnc $provider }
     $raw = Get-Content -LiteralPath $SettingsPath -Raw -ErrorAction Stop
     # JSON-escape the share paths: a UNC path holds backslashes, which must stay valid inside the JSON strings
     $profileEscaped = $ProfileShareUnc.Replace('\', '\\')
     $odfcEscaped = $OdfcShareUnc.Replace('\', '\\')
     $raw = $raw.Replace('{{profile_share_unc}}', $profileEscaped).Replace('{{odfc_share_unc}}', $odfcEscaped)
-    $settings = ConvertFrom-Json -InputObject $raw -AsHashtable -ErrorAction Stop
+    $settings = ConvertTo-FslogixHashtable (ConvertFrom-Json -InputObject $raw -ErrorAction Stop)
     $areas = [ordered]@{
         kerberos = @{ Relative = 'SYSTEM\CurrentControlSet\Control\Lsa\Kerberos\Parameters'; Values = $settings.kerberos }
         azuread  = @{ Relative = 'Software\Policies\Microsoft\AzureADAccount'; Values = $settings.azuread }
@@ -81,6 +111,27 @@ function Get-FslogixSettingPlan {
     $modeValues = $settings.profiles_by_mode[$Mode.ToLowerInvariant()]
     foreach ($name in $modeValues.Keys) {
         $areas.profiles.Values[$name] = $modeValues[$name]
+    }
+    $removals = @()
+    if ($CloudCacheProviderUnc.Count -gt 0) {
+        $index = 0
+        $ccd = ($CloudCacheProviderUnc | ForEach-Object { $index++; "type=smb,name=""PROVIDER $index"",connectionString=$_" }) -join ';'
+        foreach ($area in @('profiles', 'odfc')) {
+            $areas[$area].Values.Remove('VHDLocations')
+            $areas[$area].Values['CCDLocations'] = $ccd
+            foreach ($name in $settings.cloud_cache.Keys) { $areas[$area].Values[$name] = $settings.cloud_cache[$name] }
+            $removals += @{ Area = $area; Name = 'VHDLocations' }
+        }
+    }
+    foreach ($removal in $removals) {
+        $path = $RegistryRoot.TrimEnd('\') + '\' + $areas[$removal.Area].Relative
+        $properties = Get-ItemProperty -LiteralPath $path -ErrorAction SilentlyContinue
+        $present = $null -ne $properties -and $null -ne $properties.PSObject.Properties[$removal.Name]
+        [pscustomobject]@{
+            Area = $removal.Area; Path = $path; Name = $removal.Name; Type = 'String'; Desired = $null
+            Current = if ($present) { $properties.PSObject.Properties[$removal.Name].Value } else { $null }
+            Action = if ($present) { 'remove' } else { 'none' }
+        }
     }
     foreach ($area in $areas.Keys) {
         $path = $RegistryRoot.TrimEnd('\') + '\' + $areas[$area].Relative
@@ -218,4 +269,4 @@ function Test-FslogixAclRule {
     return [string[]]$problems.ToArray()
 }
 
-Export-ModuleMember -Function Get-FslogixSettingPlan, ConvertTo-EntraGroupSid, Get-FslogixAclPlan, Test-FslogixAclRule
+Export-ModuleMember -Function Get-FslogixSettingPlan, ConvertTo-EntraGroupSid, Get-FslogixAclPlan, Test-FslogixAclRule, Test-FslogixWindows

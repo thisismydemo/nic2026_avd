@@ -24,10 +24,10 @@ BeforeAll {
     }
 
     # Real Az cmdlets are mocked when installed (Mock follows their signatures); otherwise stubs with the same parameters.
-    if (-not (Get-Command Set-AzContext -ErrorAction SilentlyContinue)) { function Set-AzContext { param([string]$SubscriptionId) } }
+    if (-not (Get-Command Set-AzContext -ErrorAction SilentlyContinue)) { function Set-AzContext { param([string]$SubscriptionId, [string]$Scope) } }
     if (-not (Get-Command Get-AzDisk -ErrorAction SilentlyContinue)) { function Get-AzDisk { param([string]$ResourceGroupName, [string]$DiskName) } }
     if (-not (Get-Command New-AzDiskConfig -ErrorAction SilentlyContinue)) {
-        function New-AzDiskConfig { param([string]$Location, [string]$CreateOption, $GalleryImageReference, [string]$SkuName, [string]$OsType, [string]$HyperVGeneration, [int]$DiskSizeGB) }
+        function New-AzDiskConfig { param([string]$Location, [string]$CreateOption, $GalleryImageReference, [string]$SkuName, [string]$OsType, [string]$HyperVGeneration, [int]$DiskSizeGB, [string]$SecurityType) }
     }
     if (-not (Get-Command New-AzDisk -ErrorAction SilentlyContinue)) {
         function New-AzDisk { [CmdletBinding(SupportsShouldProcess)] param([string]$ResourceGroupName, [string]$DiskName, $Disk) }
@@ -121,9 +121,9 @@ Describe 'Azure Local image solution' {
             ($global:ImageEvents -join ',') | Should -Be 'show,context,diskcheck,config,disk,grant,create,revoke,remove'
         }
 
-        It 'refuses an existing image without creating a disk' {
+        It 'returns an existing image (idempotent rerun) without creating a disk' {
             $global:ImageAlreadyExists = $true
-            { & $script:importScript @script:parameters -Execute } | Should -Throw '*already exists*'
+            & $script:importScript @script:parameters -Execute | Should -Be 'image-resource-id'
             ($global:ImageEvents -join ',') | Should -Be 'show'
         }
 

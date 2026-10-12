@@ -102,7 +102,8 @@ resource "azurerm_virtual_desktop_workspace_application_group_association" "desk
 }
 
 resource "azurerm_virtual_desktop_scaling_plan" "control" {
-  count = var.enable_scaling_plan ? 1 : 0
+  depends_on = [azurerm_role_assignment.hostpool_power_on_off]
+  count      = var.enable_scaling_plan ? 1 : 0
 
   name                = var.names["scaling_plan_azure"]
   location            = var.location
@@ -117,22 +118,22 @@ resource "azurerm_virtual_desktop_scaling_plan" "control" {
     content {
       name                                 = schedule.value.name
       days_of_week                         = schedule.value.days_of_week
-      ramp_up_start_time                   = format("%02d:%02d", schedule.value.ramp_up_start_time.hour, schedule.value.ramp_up_start_time.minute)
-      ramp_up_load_balancing_algorithm     = schedule.value.ramp_up_load_balancing_algorithm
+      ramp_up_start_time                   = schedule.value.ramp_up_start_time
+      ramp_up_load_balancing_algorithm     = schedule.value.ramp_up_load_balancing
       ramp_up_minimum_hosts_percent        = schedule.value.ramp_up_minimum_hosts_percent
       ramp_up_capacity_threshold_percent   = schedule.value.ramp_up_capacity_threshold_percent
-      peak_start_time                      = format("%02d:%02d", schedule.value.peak_start_time.hour, schedule.value.peak_start_time.minute)
-      peak_load_balancing_algorithm        = schedule.value.peak_load_balancing_algorithm
-      ramp_down_start_time                 = format("%02d:%02d", schedule.value.ramp_down_start_time.hour, schedule.value.ramp_down_start_time.minute)
-      ramp_down_load_balancing_algorithm   = schedule.value.ramp_down_load_balancing_algorithm
+      peak_start_time                      = schedule.value.peak_start_time
+      peak_load_balancing_algorithm        = schedule.value.peak_load_balancing
+      ramp_down_start_time                 = schedule.value.ramp_down_start_time
+      ramp_down_load_balancing_algorithm   = schedule.value.ramp_down_load_balancing
       ramp_down_minimum_hosts_percent      = schedule.value.ramp_down_minimum_hosts_percent
       ramp_down_capacity_threshold_percent = schedule.value.ramp_down_capacity_threshold_percent
       ramp_down_force_logoff_users         = schedule.value.ramp_down_force_logoff_users
       ramp_down_wait_time_minutes          = schedule.value.ramp_down_wait_time_minutes
       ramp_down_notification_message       = schedule.value.ramp_down_notification_message
-      ramp_down_stop_hosts_when            = schedule.value.ramp_down_stop_hosts_when
-      off_peak_start_time                  = format("%02d:%02d", schedule.value.off_peak_start_time.hour, schedule.value.off_peak_start_time.minute)
-      off_peak_load_balancing_algorithm    = schedule.value.off_peak_load_balancing_algorithm
+      ramp_down_stop_hosts_when            = "ZeroSessions"
+      off_peak_start_time                  = schedule.value.off_peak_start_time
+      off_peak_load_balancing_algorithm    = schedule.value.off_peak_load_balancing
     }
   }
 }
@@ -190,5 +191,13 @@ resource "azurerm_role_assignment" "power_on_off" {
   scope                = "/subscriptions/${var.subscription_id_avd}"
   role_definition_name = "Desktop Virtualization Power On Off Contributor"
   principal_id         = var.avd_service_principal_object_id
+  principal_type       = "ServicePrincipal"
+}
+
+resource "azurerm_role_assignment" "hostpool_power_on_off" {
+  count                = var.enable_scaling_plan ? 1 : 0
+  scope                = "/subscriptions/${var.subscription_id_avd}"
+  role_definition_name = "Desktop Virtualization Power On Off Contributor"
+  principal_id         = data.azurerm_user_assigned_identity.hostpool.principal_id
   principal_type       = "ServicePrincipal"
 }

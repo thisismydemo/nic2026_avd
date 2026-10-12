@@ -193,14 +193,14 @@ resource workspace 'Microsoft.DesktopVirtualization/workspaces@2025-10-10' = {
 // gap-fill: Map the supplied schedule fields and selected host pools into a pooled scaling plan.
 resource pooledScalingPlan 'Microsoft.DesktopVirtualization/scalingPlans@2025-10-10' = if (enable_scaling_plan) {
   // The AVD service principal needs Desktop Virtualization Power On Off Contributor before autoscale can act on a pool.
-  dependsOn: [servicePrincipalPowerRole]
+  dependsOn: [servicePrincipalPowerRole, hostPoolPowerRole]
   name: names.scaling_plan_azure
   location: location
   tags: resourceTags
   properties: {
     hostPoolType: 'Pooled'
     timeZone: scaling_plan.time_zone
-    exclusionTag: scaling_plan.exclusion_tag
+    exclusionTag: scaling_plan.?exclusion_tag ?? ''
     hostPoolReferences: [for pool in scaling_plan.assigned_pools: {
       hostPoolArmPath: hostPoolIds[pool]
       scalingPlanEnabled: true
@@ -208,22 +208,34 @@ resource pooledScalingPlan 'Microsoft.DesktopVirtualization/scalingPlans@2025-10
     schedules: [for schedule in scaling_plan.schedules: {
       name: schedule.name
       daysOfWeek: schedule.days_of_week
-      rampUpStartTime: schedule.ramp_up_start_time
-      rampUpLoadBalancingAlgorithm: schedule.ramp_up_load_balancing_algorithm
+      rampUpStartTime: {
+        hour: int(split(schedule.ramp_up_start_time, ':')[0])
+        minute: int(split(schedule.ramp_up_start_time, ':')[1])
+      }
+      rampUpLoadBalancingAlgorithm: schedule.ramp_up_load_balancing
       rampUpMinimumHostsPct: schedule.ramp_up_minimum_hosts_percent
       rampUpCapacityThresholdPct: schedule.ramp_up_capacity_threshold_percent
-      peakStartTime: schedule.peak_start_time
-      peakLoadBalancingAlgorithm: schedule.peak_load_balancing_algorithm
-      rampDownStartTime: schedule.ramp_down_start_time
-      rampDownLoadBalancingAlgorithm: schedule.ramp_down_load_balancing_algorithm
+      peakStartTime: {
+        hour: int(split(schedule.peak_start_time, ':')[0])
+        minute: int(split(schedule.peak_start_time, ':')[1])
+      }
+      peakLoadBalancingAlgorithm: schedule.peak_load_balancing
+      rampDownStartTime: {
+        hour: int(split(schedule.ramp_down_start_time, ':')[0])
+        minute: int(split(schedule.ramp_down_start_time, ':')[1])
+      }
+      rampDownLoadBalancingAlgorithm: schedule.ramp_down_load_balancing
       rampDownMinimumHostsPct: schedule.ramp_down_minimum_hosts_percent
       rampDownCapacityThresholdPct: schedule.ramp_down_capacity_threshold_percent
       rampDownForceLogoffUsers: schedule.ramp_down_force_logoff_users
       rampDownWaitTimeMinutes: schedule.ramp_down_wait_time_minutes
       rampDownNotificationMessage: schedule.ramp_down_notification_message
-      rampDownStopHostsWhen: schedule.ramp_down_stop_hosts_when
-      offPeakStartTime: schedule.off_peak_start_time
-      offPeakLoadBalancingAlgorithm: schedule.off_peak_load_balancing_algorithm
+      rampDownStopHostsWhen: 'ZeroSessions'
+      offPeakStartTime: {
+        hour: int(split(schedule.off_peak_start_time, ':')[0])
+        minute: int(split(schedule.off_peak_start_time, ':')[1])
+      }
+      offPeakLoadBalancingAlgorithm: schedule.off_peak_load_balancing
     }]
   }
 }
@@ -326,3 +338,12 @@ output application_group_ids object = {
 }
 output scaling_plan_id string = enable_scaling_plan ? pooledScalingPlan.id : ''
 output hostpool_rg string = resourceGroup().name
+
+// Subscription scope is required by the documented power-management autoscale permission.
+module hostPoolPowerRole './modules/hostpool-power-role.bicep' = if (enable_scaling_plan) {
+  name: 'dep-avd-hostpool-power-role'
+  scope: subscription(subscription_id_avd)
+  params: {
+    principal_id: hostPoolIdentity.properties.principalId
+  }
+}

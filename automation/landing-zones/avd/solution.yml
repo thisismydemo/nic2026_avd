@@ -108,6 +108,7 @@ names:
   rg_stor:               { type: rg,     purpose: avd-stor }
   rg_mon:                { type: rg,     purpose: avd-mon }
   rg_arc:                { type: rg,     purpose: avd-arc }
+  rg_azl_cluster:        { type: rg,     purpose: azl }          # Azure Local cluster RG (subscription_id_azl): host-pool identity Reader (AVD on Azure Local)
   spoke_vnet:            { type: vnet,   purpose: avd }
   subnet_hosts:          { type: snet,   purpose: hosts }
   subnet_pe:             { type: snet,   purpose: pe }
