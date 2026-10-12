@@ -21,7 +21,7 @@
     },
     {
       "name": "<user>",
-      "meaning": "a cloud-only test user, for example user1@yourtenant.onmicrosoft.com"
+      "meaning": "a test user, for example user1@yourtenant.onmicrosoft.com (cloud-only works for Azure Files with Entra Kerberos; an on-site AD share such as a SOFS needs a hybrid user synchronized from AD)"
     },
     {
       "name": "<storageaccount>",
@@ -177,7 +177,7 @@
           "An Entra-joined Windows 11 VM",
           "A storage account (FileStorage or StorageV2) with a file share",
           "Rights to grant admin consent",
-          "Note: cloud-only identity support is a preview feature"
+          "Note: cloud-only identities are supported (GA) for Azure Files with Entra Kerberos; check the current Windows 11 build requirement on Microsoft Learn"
         ],
         "steps": [
           {
@@ -443,6 +443,52 @@
       }
     },
     {
+      "id": "a4c-sizing-guides",
+      "title": "Sizing AVD on Azure Local: the two public guides and this lab's numbers",
+      "section": "4",
+      "mode": "live",
+      "minutes": 0.75,
+      "followAlong": {
+        "level": "full",
+        "goal": "Size an AVD solution on Azure Local bottom-up for your own users: session hosts and the SOFS that serves the FSLogix profiles.",
+        "needs": [
+          "A browser: https://azurelocal.cloud/azurelocal-avd/ and https://azurelocal.cloud/azurelocal-sofs-fslogix/architecture/capacity-planning/",
+          "Your user count, profile size per user type and growth estimate",
+          "Your cluster's node count, capacity drives per node and memory per node"
+        ],
+        "steps": [
+          {
+            "title": "Read the AVD on Azure Local architecture",
+            "instructions": "Open https://azurelocal.cloud/azurelocal-avd/ and read the Architecture and Deployment Scenarios pages: session hosts are Azure Local VMs on a logical network, managed from Azure. Pick the scenario closest to yours and size the session hosts from user density (vCPU and memory per user).",
+            "command": "",
+            "check": "You have a session-host count and size (vCPU, memory, OS disk) for your users."
+          },
+          {
+            "title": "Size the profile storage",
+            "instructions": "Open https://azurelocal.cloud/azurelocal-sofs-fslogix/architecture/capacity-planning/ and compare https://azurelocal.cloud/azurelocal-sofs-fslogix/architecture/scenarios/. Compute usable = users × profile size × (1 + growth); guest pool = usable × guest mirror copies; data disks per VM = pool ÷ SOFS VMs; host volume per VM = OS disk + data disks + overhead; raw = host volumes × host mirror copies. Worked example from the session (two hosts): 20 users × 30 GB + 20 % = 720 GB usable → 1.44 TB guest two-way pool → 2 VMs × 4 × 256 GB (one disk per VM kept as repair reserve) → two 1.5 TiB host volumes → 6 TiB raw. On two hosts use two SOFS VMs, one per host, with a cloud witness: a third VM would share a host and losing that host would take the guest quorum.",
+            "command": "",
+            "check": "You have usable, guest pool, data-disk, host-volume and raw figures for the profiles."
+          },
+          {
+            "title": "Check the fit on the cluster",
+            "instructions": "Add the session-host and other VM volumes to the profile volumes, keep one capacity drive per node unallocated as the repair reserve, and check that every VM can restart on the remaining nodes when one node is down (vCPU and memory).",
+            "command": "",
+            "check": "Allocated volumes fit inside usable capacity minus the reserve, and the VMs fit on N-1 nodes."
+          }
+        ],
+        "troubleshooting": [
+          "Raw-to-usable looks far worse than 4:1 at small scale: the fixed OS disks and the second mirror dominate small designs; compare the guide's small-shop scenario.",
+          "Does not fit on N-1 nodes: reduce density per host, add a node, or accept that some VMs stay down during a node outage, and write that down."
+        ],
+        "cleanup": [
+          "None: nothing is deployed."
+        ],
+        "repoPaths": [
+          "handouts/Realm_Comparison.md"
+        ]
+      }
+    },
+    {
       "id": "a4b-gpu-evidence",
       "title": "GPU on Azure Local: assignment mode and evidence",
       "section": "4",
@@ -627,7 +673,7 @@
       "title": "Crossing 1: three host pools, one workspace",
       "section": "8",
       "mode": "live+recorded",
-      "minutes": 1,
+      "minutes": 0.75,
       "followAlong": {
         "level": "full",
         "goal": "Check your host pools are healthy before testing portability.",
@@ -656,7 +702,7 @@
       "title": "Crossing 2: the user is entitled to the right realm",
       "section": "8",
       "mode": "live+recorded",
-      "minutes": 3,
+      "minutes": 2.75,
       "followAlong": {
         "level": "full",
         "goal": "Control which desktop a user sees with group membership.",
@@ -811,6 +857,47 @@
         ],
         "cleanup": [
           "None."
+        ],
+        "repoPaths": [
+          "handouts/Deployment_Checklist.md"
+        ]
+      }
+    },
+    {
+      "id": "a8-6-agent",
+      "title": "Crossing 6: the Observability Agent explains the failure (preview)",
+      "section": "8",
+      "mode": "live+recorded",
+      "minutes": 0.5,
+      "followAlong": {
+        "level": "full",
+        "goal": "Investigate an Azure Monitor alert with the Azure Copilot Observability Agent (preview) and keep the result as an issue.",
+        "needs": [
+          "Access to Azure Copilot in your tenant",
+          "An Azure Monitor workspace associated with the subscription (it holds the issues)",
+          "Issue Contributor, Monitoring Contributor or Contributor on that workspace",
+          "A fired Azure Monitor alert, for example a session-host alert, in a region where the agent is available"
+        ],
+        "steps": [
+          {
+            "title": "Start an investigation from an alert",
+            "instructions": "Open a fired alert in Azure Monitor > Alerts and select Investigate. Confirm the scope the agent proposes.",
+            "command": "",
+            "check": "The agent reports its plan, then findings, hypotheses ruled out and next steps."
+          },
+          {
+            "title": "Keep the result",
+            "instructions": "Select Create issue to save the investigation as an Azure Monitor issue in your Azure Monitor workspace.",
+            "command": "",
+            "check": "The issue is listed under Monitor > Issues with the investigation attached."
+          }
+        ],
+        "troubleshooting": [
+          "Asked for an Azure Monitor workspace: associate the subscription with one (once per subscription).",
+          "No Investigate action: check that your account has Azure Copilot access."
+        ],
+        "cleanup": [
+          "Close or delete test issues; chat and investigations are billed per use."
         ],
         "repoPaths": [
           "handouts/Deployment_Checklist.md"
