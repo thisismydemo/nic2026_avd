@@ -500,7 +500,7 @@
       "minutes": 0.5,
       "followAlong": {
         "level": "read",
-        "goal": "Understand GPU by DDA versus GPU partitioning on Azure Local and what each needs.",
+        "goal": "Understand GPU by DDA versus GPU partitioning on Azure Local, what the free driver gives (compute and AI) and what desktop graphics acceleration needs (NVIDIA vWS licensing).",
         "needs": [],
         "steps": [],
         "troubleshooting": [],

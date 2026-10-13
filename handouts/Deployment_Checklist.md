@@ -109,7 +109,7 @@ Scaling facts:
 - Autoscale needs the Desktop Virtualization Power On Off Contributor role for the Azure Virtual Desktop service principal, at host pool, resource group or subscription scope.
 - Do not use autoscale and the Azure Automation scaling tool on the same host pool.
 - Session host configuration is not supported on Azure Local, so dynamic autoscale is not available there, and the Learn autoscale articles do not list Azure Local for power management; confirm before you rely on it.
-- Start VM on Connect is an Azure option.
+- Start VM on Connect works for session hosts on Azure and on Azure Local, in personal and pooled host pools; it needs the Desktop Virtualization Power On Contributor role. It is not available for AVD Hybrid.
 
 ## Security
 
