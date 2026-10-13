@@ -1,4 +1,4 @@
-# Realm comparison: AVD on Azure, Azure Local and AVD Hybrid
+# Platform comparison: AVD on Azure, Azure Local and AVD Hybrid
 
 Thirteen rows, three deployment models. The session slide shows five of these rows (locality, lifecycle owner, identity and OS, operations, support and licensing); this handout has all thirteen.
 

@@ -16,7 +16,7 @@ The same user follows three paths and receives three different tokens; no passwo
 2. **User to host.** With single sign-on enabled, the user authenticates to the session host with a Microsoft Entra token issued through the Windows Cloud Login application, instead of typing credentials.
 3. **Host, as the user, to the share.** The session host asks Microsoft Entra ID for a Kerberos ticket for the storage account (`cifs/<storageaccount>.file.core.windows.net`; with Microsoft Entra Kerberos the ticket encryption is always AES-256) and mounts the profile share over SMB. The share then enforces share-level RBAC plus NTFS ACLs per user folder.
 
-A proof you can show: run `klist get cifs/<storageaccount>.file.core.windows.net`, then `klist` inside the session. It lists a cifs ticket from the Entra realm.
+A proof you can show: run `klist get cifs/<storageaccount>.file.core.windows.net`, then `klist` inside the session. It lists a cifs ticket issued by Microsoft Entra Kerberos (KERBEROS.MICROSOFTONLINE.COM).
 
 ## Building blocks
 

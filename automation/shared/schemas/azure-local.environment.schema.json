@@ -723,6 +723,13 @@
               "target_vm_size": {
                 "type": "string",
                 "pattern": "^Standard_[A-Za-z0-9_]+$"
+              },
+              "os_type": {
+                "enum": [
+                  "Windows",
+                  "Linux"
+                ],
+                "description": "Used when the protectable item reports no operating system."
               }
             }
           }

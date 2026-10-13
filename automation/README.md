@@ -1,6 +1,6 @@
 # AVD Anywhere: deployment automation
 
-Automation that deploys the AVD Anywhere session's three realms (Azure, Azure Local, AVD Hybrid) from one configuration. Every value comes from a parameter, a `solution.yml` input or your environment files; nothing in the code is tied to a tenant, subscription, site or piece of hardware. Bicep and Terraform are kept in parity; PowerShell does the orchestration and the guest-level steps.
+Automation that deploys the AVD Anywhere session's three deployment models (Azure, Azure Local, AVD Hybrid) from one configuration. Every value comes from a parameter, a `solution.yml` input or your environment files; nothing in the code is tied to a tenant, subscription, site or piece of hardware. Bicep and Terraform are kept in parity; PowerShell does the orchestration and the guest-level steps.
 
 ## Map
 
@@ -12,9 +12,9 @@ automation/
 │   ├── control-plane/               workspace, host pools, application groups, scaling plan
 │   ├── fslogix/                     share permissions, host settings, redirections.xml
 │   ├── images/                      Azure Image Builder (Azure, Azure Local); Packer templates for Hyper-V (tested), vSphere and Nutanix AHV (reference, not run)
-│   ├── session-hosts-azure/         realm "Azure"
-│   ├── session-hosts-azure-local/   realm "Azure Local"
-│   └── session-hosts-hybrid/        realm "Hybrid": Hyper-V VMs, Arc agent, CloudDeviceExtension
+│   ├── session-hosts-azure/         platform "Azure"
+│   ├── session-hosts-azure-local/   platform "Azure Local"
+│   └── session-hosts-hybrid/        platform "Hybrid": Hyper-V VMs, Arc agent, CloudDeviceExtension
 └── demo/{avd,shared}/               the helpers the follow-along guide uses (state, routing, portability, failure, smoke test)
 ```
 
@@ -27,7 +27,7 @@ automation/
 | 3 | Control plane | `avd/control-plane` |
 | 4 | FSLogix | `avd/fslogix` |
 | 5 | Images | `avd/images/*` |
-| 6 | Session hosts per realm | `avd/session-hosts-*` |
+| 6 | Session hosts per platform | `avd/session-hosts-*` |
 | 7 | Demo helpers | `demo/avd` |
 
 For every solution the loop is the same:

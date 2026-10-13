@@ -1,6 +1,6 @@
 # avd-session-hosts-hybrid
 
-AVD Hybrid realm: two plain **Generation 2 Hyper-V VMs** on the Azure Local cluster (clustered VM roles outside Azure Local VM management), Entra-joined by a provisioning package, Arc-enabled, and registered to the Hybrid host pool through the `Microsoft.AzureVirtualDesktop.CloudDeviceExtension`. Implements `design/avd/hybrid-hyperv-hosts.md` (HYB-01..09).
+AVD Hybrid host pool: two plain **Generation 2 Hyper-V VMs** on the Azure Local cluster (clustered VM roles outside Azure Local VM management), Entra-joined by a provisioning package, Arc-enabled, and registered to the Hybrid host pool through the `Microsoft.AzureVirtualDesktop.CloudDeviceExtension`. Implements `design/avd/hybrid-hyperv-hosts.md` (HYB-01..09).
 
 Authored by gpt-6-sol via the HCS Foundry gateway; external review is recorded in `design/shared/verification-log.md`. Nothing here is deployed.
 

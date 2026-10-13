@@ -39,12 +39,12 @@
   "sections": [
     {
       "id": "0",
-      "title": "Open — three realms, one desktop",
+      "title": "Open — three terminals, one desktop",
       "minutes": 2
     },
     {
       "id": "1",
-      "title": "The realms compared — five decision axes",
+      "title": "Terminals compared — five decision axes",
       "minutes": 2
     },
     {
@@ -74,7 +74,7 @@
     },
     {
       "id": "6",
-      "title": "Profiles — one pattern for three realms",
+      "title": "Profiles — one pattern for three terminals",
       "minutes": 8
     },
     {
@@ -84,7 +84,7 @@
     },
     {
       "id": "8",
-      "title": "The crossing — live end-to-end demo",
+      "title": "The connecting flight — live end-to-end demo",
       "minutes": 13
     },
     {
@@ -488,7 +488,7 @@
           "None: nothing is deployed."
         ],
         "repoPaths": [
-          "handouts/Realm_Comparison.md"
+          "handouts/Platform_Comparison.md"
         ]
       }
     },
@@ -642,7 +642,7 @@
     },
     {
       "id": "a7-pipeline",
-      "title": "One repo, one config, three realms",
+      "title": "One repo, one config, three terminals",
       "section": "7",
       "mode": "live",
       "minutes": 1,
@@ -674,7 +674,7 @@
     },
     {
       "id": "a8-1-state",
-      "title": "Crossing 1: three host pools, one workspace",
+      "title": "Connecting flight 1: three host pools, one workspace",
       "section": "8",
       "mode": "live+recorded",
       "minutes": 0.75,
@@ -703,7 +703,7 @@
     },
     {
       "id": "a8-2-entitlement",
-      "title": "Crossing 2: the user is entitled to the right realm",
+      "title": "Connecting flight 2: the user is entitled to the right terminal",
       "section": "8",
       "mode": "live+recorded",
       "minutes": 2.75,
@@ -741,7 +741,7 @@
     },
     {
       "id": "a8-3-portability",
-      "title": "Crossing 3: profile portability across realms",
+      "title": "Connecting flight 3: profile portability across terminals",
       "section": "8",
       "mode": "live+recorded",
       "minutes": 5,
@@ -786,7 +786,7 @@
     },
     {
       "id": "a8-4-failure",
-      "title": "Crossing 4: forced host failure on Hybrid",
+      "title": "Connecting flight 4: forced host failure on Hybrid",
       "section": "8",
       "mode": "live+recorded",
       "minutes": 3,
@@ -819,7 +819,7 @@
           },
           {
             "title": "Restart host 1",
-            "instructions": "Start the VM; AVD does not do this for you in a Hybrid realm.",
+            "instructions": "Start the VM; AVD does not do this for you in a Hybrid host pool.",
             "command": "Start-VM -Name <host 1>",
             "check": "The host returns to Available."
           }
@@ -838,7 +838,7 @@
     },
     {
       "id": "a8-5-monitoring",
-      "title": "Crossing 5: one monitoring layer",
+      "title": "Connecting flight 5: one monitoring layer",
       "section": "8",
       "mode": "live+recorded",
       "minutes": 1,
@@ -869,7 +869,7 @@
     },
     {
       "id": "a8-6-agent",
-      "title": "Crossing 6: the Observability Agent explains the failure (preview)",
+      "title": "Connecting flight 6: the Observability Agent explains the failure (preview)",
       "section": "8",
       "mode": "live+recorded",
       "minutes": 0.5,

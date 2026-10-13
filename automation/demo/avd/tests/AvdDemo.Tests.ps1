@@ -32,7 +32,7 @@ BeforeAll {
         log_analytics_workspace_id = ''
         entra_groups = @{ avd_azure = 'grp-iic-nic26-avd-azure'; avd_azl = 'grp-iic-nic26-avd-azl'; avd_hybrid = 'grp-iic-nic26-avd-hybrid' }
         demo_users = @(@{ upn = 'user1@contoso.com'; display_name = 'User 1'; realm = 'azure' }, @{ upn = 'user2@contoso.com'; display_name = 'User 2'; realm = 'azl' })
-        host_pools = @{ azure = @{ friendly_name = 'Asgard' }; azl = @{ friendly_name = 'Midgard' }; hybrid = @{ friendly_name = 'Outer realms' } }
+        host_pools = @{ azure = @{ friendly_name = 'Terminal A' }; azl = @{ friendly_name = 'Terminal B' }; hybrid = @{ friendly_name = 'Terminal C' } }
         share_names = @{ profiles = 'nic26-fslogix-profiles'; odfc = 'nic26-fslogix-odfc' }
         hybrid = @{ vms = @(@{ name = 'nic26-avd-hv01'; owner_node = 'nic26-01-n01' }, @{ name = 'nic26-avd-hv02'; owner_node = 'nic26-01-n02' }) }
     }

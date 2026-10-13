@@ -2,7 +2,7 @@
 
 Creates two Azure Image Builder templates in the existing image resource group from the shared customizers (`../shared/customizers`, embedded inline; no staging storage). `lz-avd` supplies the gallery, the image definitions, the AIB user-assigned identity and the image-build subnet.
 
-- **azure** template: distributes to its gallery image definition (the Azure realm uses it).
+- **azure** template: distributes to its gallery image definition (the Azure host pool uses it).
 - **azl** template: distributes to its gallery definition **and** a VHD run output. AIB has no Azure Local distribute target; `avd-images-azure-local` imports the image into Azure Local.
 
 Authored by gpt-6-sol via the HCS Foundry gateway; review is recorded in `design/shared/verification-log.md`.

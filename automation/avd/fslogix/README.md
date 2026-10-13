@@ -1,6 +1,6 @@
 # avd-fslogix
 
-One `fslogix-settings.json` serves the Azure VM, Azure Local VM and Hyper-V VM session hosts ("one configuration profile, three realms"). It holds share **tokens**, not share names: pass the profile and ODFC UNC share roots (outputs `fslogix_profile_unc` and `fslogix_odfc_unc` of `lz-avd`) when you run the scripts. Nothing changes without `-Execute`; execution also honours `-WhatIf`. Design: `design/avd/landing-zone.md` §7.
+One `fslogix-settings.json` serves the Azure VM, Azure Local VM and Hyper-V VM session hosts ("one configuration profile, three platforms"). It holds share **tokens**, not share names: pass the profile and ODFC UNC share roots (outputs `fslogix_profile_unc` and `fslogix_odfc_unc` of `lz-avd`) when you run the scripts. Nothing changes without `-Execute`; execution also honours `-WhatIf`. Design: `design/avd/landing-zone.md` §7.
 
 ## Run order
 

@@ -22,7 +22,7 @@ This handout answers the questions attendees ask most often and lists where to r
 
 - Azure Local needs version 23H2 or later registered with Azure, and supports Windows 11 Enterprise (multi-session and single-session), Windows 10 Enterprise, and Windows Server 2025, 2022 and 2019.
 - Hybrid supports Windows 11 or 10 Enterprise single-session and Windows Server, but not multi-session. It has no power management, autoscale, Start VM on Connect or session host configuration.
-- The Realm Comparison handout covers all thirteen axes.
+- The Platform Comparison handout covers all thirteen axes.
 
 ## Identity and sign-in
 
@@ -56,7 +56,7 @@ The FSLogix Configuration Guide has the settings.
 
 **How are Hybrid images built?** Typically with Packer and the platform builder for your hypervisor.
 
-**Any practices to keep?** Share customisation scripts between realms and do not bake identity into an image. For pooled pools, this session's practice is to replace hosts from a new image version instead of patching in place; that is the session's practice, not a Microsoft requirement.
+**Any practices to keep?** Share customisation scripts between platforms and do not bake identity into an image. For pooled pools, this session's practice is to replace hosts from a new image version instead of patching in place; that is the session's practice, not a Microsoft requirement.
 
 ## Networking
 
@@ -138,7 +138,7 @@ Microsoft Learn topics:
 
 In this repository:
 
-- [Realm comparison](Realm_Comparison.md)
+- [Platform comparison](Platform_Comparison.md)
 - [Identity reference architecture](Identity_Reference_Architecture.md)
 - [FSLogix configuration guide](FSLogix_Configuration_Guide.md)
 - [Deployment checklist](Deployment_Checklist.md)

@@ -280,7 +280,7 @@ Replace the placeholders in the commands with your own values:
 
 - None: nothing is deployed.
 
-**In the repo:** `handouts/Realm_Comparison.md`
+**In the repo:** `handouts/Platform_Comparison.md`
 
 ### Plain Hyper-V VMs seen in Azure only as Arc machines
 
@@ -410,7 +410,7 @@ Replace the placeholders in the commands with your own values:
 
 **In the repo:** `automation/avd/fslogix`
 
-### One repo, one config, three realms
+### One repo, one config, three terminals
 
 **Goal:** Preview a change to the AVD control plane without applying it.
 
@@ -439,7 +439,7 @@ Replace the placeholders in the commands with your own values:
 
 **In the repo:** `automation/avd/control-plane`
 
-### Crossing 1: three host pools, one workspace
+### Connecting flight 1: three host pools, one workspace
 
 **Goal:** Check your host pools are healthy before testing portability.
 
@@ -463,7 +463,7 @@ Replace the placeholders in the commands with your own values:
 
 **In the repo:** `automation/demo/avd/scripts/Show-AvdState.ps1`
 
-### Crossing 2: the user is entitled to the right realm
+### Connecting flight 2: the user is entitled to the right terminal
 
 **Goal:** Control which desktop a user sees with group membership.
 
@@ -500,7 +500,7 @@ Replace the placeholders in the commands with your own values:
 
 **In the repo:** `automation/demo/avd/scripts/Switch-UserHostPool.ps1`
 
-### Crossing 3: profile portability across realms
+### Connecting flight 3: profile portability across terminals
 
 **Goal:** Prove a profile follows a user across two host pools.
 
@@ -538,7 +538,7 @@ Replace the placeholders in the commands with your own values:
 
 **In the repo:** `automation/demo/avd/scripts/Test-ProfilePortability.ps1`, `automation/avd/fslogix`
 
-### Crossing 4: forced host failure on Hybrid
+### Connecting flight 4: forced host failure on Hybrid
 
 **Goal:** See what a host failure does to a session and what survives.
 
@@ -566,7 +566,7 @@ Replace the placeholders in the commands with your own values:
    ```
 
    - You should see: You are on host 2; your saved files and settings are present; the unsaved document is not.
-4. **Restart host 1.** Start the VM; AVD does not do this for you in a Hybrid realm.
+4. **Restart host 1.** Start the VM; AVD does not do this for you in a Hybrid host pool.
 
    ```powershell
    Start-VM -Name <host 1>
@@ -584,7 +584,7 @@ Replace the placeholders in the commands with your own values:
 
 **In the repo:** `automation/demo/avd/scripts/Stop-SessionHost.ps1`, `automation/demo/avd/scripts/Restore-SessionHost.ps1`
 
-### Crossing 5: one monitoring layer
+### Connecting flight 5: one monitoring layer
 
 **Goal:** Query all your hosts from one workspace.
 
@@ -612,7 +612,7 @@ Replace the placeholders in the commands with your own values:
 
 **In the repo:** `handouts/Deployment_Checklist.md`
 
-### Crossing 6: the Observability Agent explains the failure (preview)
+### Connecting flight 6: the Observability Agent explains the failure (preview)
 
 **Goal:** Investigate an Azure Monitor alert with the Azure Copilot Observability Agent (preview) and keep the result as an issue.
 

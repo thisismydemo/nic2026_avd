@@ -1,6 +1,6 @@
 # avd-images-packer-hyperv
 
-Packer `hyperv-iso` builds a generalized **Windows 11 Enterprise 25H2 Generation 2** VHDX (Secure Boot, vTPM) on an Azure Local node for the AVD Hybrid realm. It uses the shared customizers (`../shared/customizers`, scripts 01-06), including the Arc agent MSI (installed, never connected).
+Packer `hyperv-iso` builds a generalized **Windows 11 Enterprise 25H2 Generation 2** VHDX (Secure Boot, vTPM) on an Azure Local node for the AVD Hybrid host pool. It uses the shared customizers (`../shared/customizers`, scripts 01-06), including the Arc agent MSI (installed, never connected).
 
 Authored by gpt-6-sol via the HCS Foundry gateway; review is recorded in `design/shared/verification-log.md`. **`packer init`, `packer fmt -check` and `packer validate` pass with Packer 1.16.1 and the hyperv plugin 1.1.5 (review R-39); a build itself has never been run, so the first build on the Hyper-V host is the real test.** The template needs `customizer_directory` to point at the real shared customizers when validating.
 
