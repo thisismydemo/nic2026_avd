@@ -68,6 +68,19 @@ module "nsg_hosts" {
   diagnostic_settings = local.diag
 
   security_rules = {
+    # D-056 (owner, 12 Oct 2026): the jump server is never blocked by any NSG
+    jump_server_in = {
+      name                       = "AllowJumpServerInbound"
+      priority                   = 101
+      direction                  = "Inbound"
+      access                     = "Allow"
+      protocol                   = "*"
+      source_address_prefix      = var.jump_admin_source_prefix
+      source_port_range          = "*"
+      destination_address_prefix = "*"
+      destination_port_range     = "*"
+      description                = "Jump server is never blocked (owner, 12 Oct 2026)"
+    }
     shortpath_in = {
       name                       = "AllowShortpathManagedInbound"
       priority                   = 100
@@ -261,6 +274,19 @@ module "nsg_pe" {
   diagnostic_settings = local.diag
 
   security_rules = {
+    # D-056 (owner, 12 Oct 2026): the jump server is never blocked by any NSG
+    jump_server_in = {
+      name                       = "AllowJumpServerInbound"
+      priority                   = 101
+      direction                  = "Inbound"
+      access                     = "Allow"
+      protocol                   = "*"
+      source_address_prefix      = var.jump_admin_source_prefix
+      source_port_range          = "*"
+      destination_address_prefix = "*"
+      destination_port_range     = "*"
+      description                = "Jump server is never blocked (owner, 12 Oct 2026)"
+    }
     smb_in = {
       name                       = "AllowSmbInbound"
       priority                   = 100
@@ -298,6 +324,19 @@ module "nsg_imgbuild" {
   diagnostic_settings = local.diag
 
   security_rules = {
+    # D-056 (owner, 12 Oct 2026): the jump server is never blocked by any NSG
+    jump_server_in = {
+      name                       = "AllowJumpServerInbound"
+      priority                   = 101
+      direction                  = "Inbound"
+      access                     = "Allow"
+      protocol                   = "*"
+      source_address_prefix      = var.jump_admin_source_prefix
+      source_port_range          = "*"
+      destination_address_prefix = "*"
+      destination_port_range     = "*"
+      description                = "Jump server is never blocked (owner, 12 Oct 2026)"
+    }
     aib_proxy_in = {
       name                       = "AllowImageBuilderProxyInbound"
       priority                   = 100

@@ -191,3 +191,28 @@ Describe 'Arc registration' {
         $global:AzureLocalFake.Removed | Should -Be 1
     }
 }
+
+Describe 'GPU demo workload (a4b option B)' {
+    BeforeAll {
+        $script:gpuDir = Join-Path (Split-Path -Parent $PSScriptRoot) 'scripts'
+        $script:gpuInstall = Get-Content (Join-Path $script:gpuDir 'Install-GpuDemoWorkload.ps1') -Raw
+        $script:gpuInvoke = Get-Content (Join-Path $script:gpuDir 'Invoke-GpuDemoWorkload.ps1') -Raw
+    }
+    It 'parses, holds no lab values and never touches the NVIDIA driver' {
+        foreach ($f in 'Install-GpuDemoWorkload.ps1', 'Invoke-GpuDemoWorkload.ps1') {
+            $errs = $null; $null = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $script:gpuDir $f), [ref]$null, [ref]$errs)
+            $errs | Should -BeNullOrEmpty
+        }
+        foreach ($t in $script:gpuInstall, $script:gpuInvoke) {
+            $t | Should -Not -Match '\b(10|172|192)\.\d{1,3}\.\d{1,3}\.\d{1,3}\b'
+            $t | Should -Not -Match '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
+        }
+        $script:gpuInstall | Should -Not -Match 'pnputil|-f?dm 0|\.inf\b'
+        $script:gpuInstall | Should -Match 'Python Software Foundation'
+    }
+    It 'drains the host for the change and restores AllowNewSession, gated behind -Execute' {
+        $body = ($script:gpuInvoke -split '\$doInstall = ')[1]
+        $body.IndexOf('-not $Execute') | Should -BeLessThan $body.IndexOf('Set-Drain $false')
+        $script:gpuInvoke | Should -Match 'finally \{ if \(\$before\) \{ Set-Drain \$true \} \}'
+    }
+}

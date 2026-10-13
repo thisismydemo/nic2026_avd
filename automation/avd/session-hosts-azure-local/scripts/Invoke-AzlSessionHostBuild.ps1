@@ -9,10 +9,12 @@ Succeeded, writes an ARM JSON parameters file to the temp folder (removed after 
   1. Invoke-SessionHostsAzureLocalDeploy.ps1 (Bicep What-If, or deployment with -Execute): Arc machine, NIC on the
      logical network, VM instance on the host's storage path (API 2026-04-01-preview), AD join through
      JsonADDomainExtension into the AVD OU (D-050), Azure Monitor Agent and the DCR association.
-  1b. Guest default route: the SDN host DHCP hands the static NIC its IP and DNS but no default gateway (found 12 Oct
-     2026, also on the SOFS VMs), so the guest cannot reach Azure (Arc guest management), the DCs (AD join) or the
-     SOFS. While the deployment waits for the join extension, the script adds a persistent 0.0.0.0/0 route to the
-     logical network's next hop inside each guest over PowerShell Direct from the node that runs it.
+  1b. Guest network check: the guest must get its default gateway from the logical network's DHCP; the script never
+     adds an in-guest route (owner, 12 Oct 2026). While the deployment waits for the join extension, it reads each
+     guest over PowerShell Direct from the node that runs it (shared/scripts/NIC26.GuestNetwork.ps1) and fails when a
+     guest that answers has no DHCP-supplied gateway after -GatewayTimeoutMinutes (the AD join and Arc onboarding
+     need it). After the deployment, a host whose Arc agent is not Connected gets guest management re-triggered
+     (az stack-hci-vm update --enable-agent true, Learn: Manage Azure Local VMs).
   2. Merges the environment tags (project=nic26 and the realm tags) onto each Arc machine and NIC and reads them back.
   3. Register-AvdSessionHostsAzureLocal.ps1: a fresh registration token per host, passed only as an Arc Run Command
      protected parameter (K-7), then waits for Available.
@@ -21,10 +23,13 @@ the registration step. Without -Execute nothing changes (What-If and a plan of t
 .PARAMETER EnvironmentFile
 Path to environment/avd/environment.yml.
 .PARAMETER VmName
-Limit the deployment, route stage and registration to these hosts (Arc machine names). Use it to add a host (for
+Limit the deployment, network check and registration to these hosts (Arc machine names). Use it to add a host (for
 example the GPU host) without re-sending the existing hosts' VM and join resources.
-.PARAMETER GuestRouteOnly
-Only apply the guest default route (stage 1b) to hosts that already exist, then stop.
+.PARAMETER GuestNetworkOnly
+Only run the guest network check (stage 1b) and the guest-management re-trigger on hosts that already exist, then stop
+(alias -GuestRouteOnly, kept for existing run sheets; it adds no route).
+.PARAMETER GatewayTimeoutMinutes
+How long a guest that answers may stay without a DHCP-supplied default gateway before the build fails (default 15).
 .PARAMETER SkipRegistration
 Deploy only; do not register the hosts with the host pool.
 .PARAMETER Execute
@@ -35,9 +40,10 @@ Apply. Without it only What-If and plans run.
 param(
     [Parameter(Mandatory)][string]$EnvironmentFile,
     [switch]$SkipRegistration,
-    # Only (re)apply the guest default route on the existing hosts (see stage 1b).
     [string[]]$VmName,
-    [switch]$GuestRouteOnly,
+    # Only check the guest network (DHCP gateway) and re-trigger guest management on the existing hosts (stage 1b).
+    [Alias('GuestRouteOnly')][switch]$GuestNetworkOnly,
+    [ValidateRange(1, 120)][int]$GatewayTimeoutMinutes = 15,
     [switch]$Execute
 )
 
@@ -50,6 +56,7 @@ if (-not (Get-Command Resolve-NIC26KeyVaultRef -ErrorAction SilentlyContinue)) {
     $module = Join-Path $PSScriptRoot '../../../shared/powershell/NIC26.Automation/NIC26.Automation.psd1'
     Import-Module (Resolve-Path $module).Path -ErrorAction Stop
 }
+. (Join-Path $PSScriptRoot '../../../shared/scripts/NIC26.GuestNetwork.ps1')
 
 $envData = Get-Content -LiteralPath $EnvironmentFile -Raw | ConvertFrom-Yaml
 $cfg = $envData['azl_session_hosts']
@@ -78,40 +85,42 @@ $lnetDns = @((Get-AzResource -ResourceId $lnet.ResourceId -ExpandProperties).Pro
 $lnetProps = (Get-AzResource -ResourceId $lnet.ResourceId -ExpandProperties).Properties
 $gateway = [string](@($lnetProps.subnets[0].properties.routeTable.properties.routes | Where-Object { $_.properties.addressPrefix -eq '0.0.0.0/0' })[0].properties.nextHopIpAddress)
 
-function Set-GuestDefaultRoute {
-    # Stage 1b: returns the number of hosts that have the route.
+function Test-GuestNetwork {
+    # Stage 1b: returns the number of hosts whose guest has a DHCP-supplied default gateway. Adds no route.
     param([object[]]$HostList)
-    if (-not $gateway) { Write-Warning 'The logical network has no default route; guest route skipped.'; return 0 }
     $nodeCred = [pscredential]::new(
         [string](Resolve-NIC26KeyVaultRef -Ref $cfg['node_admin_username_secret'] -AsPlainText),
         (Resolve-NIC26KeyVaultRef -Ref $cfg['node_admin_password_secret']))
     $guestUser = [string](Resolve-NIC26KeyVaultRef -Ref $envData['secret_refs']['sessionhost_local_admin_username'] -AsPlainText)
     $guestPw = Resolve-NIC26KeyVaultRef -Ref $envData['secret_refs']['sessionhost_local_admin_password']
-    $done = 0
+    $ok = 0
     foreach ($h in $HostList) {
         $guestCred = [pscredential]::new("$($h['computer_name'])\$guestUser", $guestPw)
-        foreach ($node in @($cfg['node_addresses'])) {
-            $r = Invoke-Command -ComputerName $node -Credential $nodeCred -ArgumentList $h['name'], $guestCred, $gateway -ScriptBlock {
-                param($name, [pscredential]$cred, $g)
-                $vm = Get-VM | Where-Object { $_.Name -like "$name-*" -or $_.Name -eq $name } | Where-Object State -EQ 'Running' | Select-Object -First 1
-                if (-not $vm) { return $null }
-                try {
-                    Invoke-Command -VMName $vm.Name -Credential $cred -ArgumentList $g -ErrorAction Stop -ScriptBlock {
-                        param($gw)
-                        if (Get-NetRoute -DestinationPrefix '0.0.0.0/0' -AddressFamily IPv4 -PolicyStore PersistentStore -ErrorAction SilentlyContinue | Where-Object NextHop -EQ $gw) { return 'present' }
-                        $if = @(Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' })[0]
-                        New-NetRoute -DestinationPrefix '0.0.0.0/0' -InterfaceIndex $if.InterfaceIndex -NextHop $gw -RouteMetric 10 | Out-Null
-                        'added'
-                    }
-                }
-                catch { "guest not ready: $($_.Exception.Message)" }
-            }
-            if ($r) { Write-Information "$($h['name']): default route via $gateway $r"; if ($r -in 'present', 'added') { $done++ }; break }
-        }
+        $st = Get-NIC26GuestNetworkState -NodeAddress @($cfg['node_addresses']) -NodeCredential $nodeCred -VmName ([string]$h['name']) -GuestCredential $guestCred
+        $name = [string]$h['name']
+        if ($st.State -ne 'ok') { Write-Information "${name}: guest $($st.State)"; continue }
+        if (-not $script:guestSeen.ContainsKey($name)) { $script:guestSeen[$name] = Get-Date }
+        if ($st.DhcpGateway) { Write-Information "${name}: DHCP gateway $($st.DhcpGateway) (expected $gateway), Azure 443 $($st.EndpointReachable)"; $ok++; continue }
+        $waited = ((Get-Date) - $script:guestSeen[$name]).TotalMinutes
+        Write-Information ("{0}: no DHCP-supplied default gateway yet ({1:N0} of {2} min; active default routes '{3}')" -f $name, $waited, $GatewayTimeoutMinutes, $st.ActiveDefaultRoutes)
+        if ($waited -ge $GatewayTimeoutMinutes) { throw "${name}: the logical network's DHCP supplied no default gateway within $GatewayTimeoutMinutes min; no route is added (owner). Check the logical network / SDN DHCP." }
     }
-    return $done
+    return $ok
 }
-if ($GuestRouteOnly) { $null = Set-GuestDefaultRoute -HostList @($cfg['hosts'] | Where-Object { -not $VmName -or $VmName -contains [string]$_['name'] }); return }
+function Invoke-GuestManagementCheck {
+    param([object[]]$HostList)
+    foreach ($h in $HostList) {
+        $r = Invoke-NIC26GuestManagementRetry -SubscriptionId $azlSub -ResourceGroup $rg -VmName ([string]$h['name'])
+        Write-Information "$($h['name']): Arc $($r.Status)$(if ($r.Retriggered) { ' (guest management re-triggered)' })"
+    }
+}
+$script:guestSeen = @{}
+if ($GuestNetworkOnly) {
+    $list = @($cfg['hosts'] | Where-Object { -not $VmName -or $VmName -contains [string]$_['name'] })
+    $null = Test-GuestNetwork -HostList $list
+    if ($Execute) { Invoke-GuestManagementCheck -HostList $list }
+    return
+}
 $dcr = Get-ArmId $avdSub $cfg['dcr_resource_group'] 'Microsoft.Insights/dataCollectionRules' $cfg['dcr_name']
 
 $hosts = @($cfg['hosts'] | Where-Object { -not $VmName -or $VmName -contains [string]$_['name'] })
@@ -193,8 +202,8 @@ try {
         & (Join-Path $PSScriptRoot 'Invoke-SessionHostsAzureLocalDeploy.ps1') @deploy
     }
     else {
-        # The deployment waits for the AD join extension, which needs the guest route of stage 1b: run it as a job and
-        # set the route as soon as each guest answers.
+        # The deployment waits for the AD join extension, which needs the guest's DHCP gateway (stage 1b): run it as a
+        # job and check each guest as soon as it answers; fail when a guest stays without a DHCP gateway.
         $deployScript = Join-Path $PSScriptRoot 'Invoke-SessionHostsAzureLocalDeploy.ps1'
         $modulePath = (Get-Module NIC26.Automation | Select-Object -First 1).Path
         $job = Start-ThreadJob -ArgumentList $deployScript, $deploy, $modulePath -ScriptBlock {
@@ -202,12 +211,16 @@ try {
             Import-Module $module -ErrorAction Stop   # a thread job starts with an empty module table
             & $script @arguments -Execute
         }
-        $routed = 0
+        $withGateway = 0
         while ($job.State -in 'NotStarted', 'Running') {
             Start-Sleep -Seconds 60
-            if ($routed -lt $hosts.Count) { $routed = Set-GuestDefaultRoute -HostList $hosts }
+            if ($withGateway -lt $hosts.Count) {
+                try { $withGateway = Test-GuestNetwork -HostList $hosts }
+                catch { Write-Warning "$($_.Exception.Message) The ARM deployment keeps running in Azure; stopping the local wait."; Stop-Job -Job $job; throw }
+            }
         }
         Receive-Job -Job $job -Wait -ErrorAction Stop
+        Invoke-GuestManagementCheck -HostList $hosts
     }
 }
 finally {

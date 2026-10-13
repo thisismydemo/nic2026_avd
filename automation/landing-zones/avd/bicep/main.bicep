@@ -191,6 +191,7 @@ module network 'modules/network.bicep' = {
     p2s_pool: p2s_pool
     onprem_compute_prefixes: onprem_compute_prefixes
     admin_source_prefixes: [bastion_subnet_prefix, jump_admin_source_prefix]
+    jump_server_source_prefix: jump_admin_source_prefix
     azl_spoke_prefix: azl_spoke_prefix
     log_analytics_workspace_id: log_analytics_workspace_id
     enable_dns_private_resolver: enable_private_endpoints && enable_dns_private_resolver

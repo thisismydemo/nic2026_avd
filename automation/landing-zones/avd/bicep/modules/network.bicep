@@ -10,6 +10,8 @@ param avd_subnets object
 param p2s_pool string
 param onprem_compute_prefixes array
 param admin_source_prefixes array
+@description('D-056: private IPv4 /32 of the jump server; every NSG gets AllowJumpServerInbound (101, all protocols and ports) from it.')
+param jump_server_source_prefix string
 param azl_spoke_prefix string
 param log_analytics_workspace_id string
 param enable_dns_private_resolver bool
@@ -25,6 +27,22 @@ var diagnosticSettings = [
 var shortpathSources = concat([p2s_pool], onprem_compute_prefixes)
 var smbSources = concat([avd_subnets.hosts, azl_spoke_prefix], onprem_compute_prefixes)
 
+// D-056 (owner, 12 Oct 2026): the jump server is never blocked by any NSG - one allow-all inbound rule at 101 on all three NSGs
+var jumpServerRule = {
+  name: 'AllowJumpServerInbound'
+  properties: {
+    priority: 101
+    direction: 'Inbound'
+    access: 'Allow'
+    protocol: '*'
+    sourceAddressPrefix: jump_server_source_prefix
+    sourcePortRange: '*'
+    destinationAddressPrefix: '*'
+    destinationPortRange: '*'
+    description: 'Jump server is never blocked (owner, 12 Oct 2026)'
+  }
+}
+
 // ---------------------------------------------------------------------------------------------------------------------
 // NSGs — design §4.6
 // ---------------------------------------------------------------------------------------------------------------------
@@ -36,6 +54,7 @@ module nsgHosts 'br/public:avm/res/network/network-security-group:0.5.3' = {
     tags: tags
     diagnosticSettings: diagnosticSettings
     securityRules: [
+      jumpServerRule
       {
         name: 'AllowShortpathManagedInbound'
         properties: {
@@ -261,6 +280,7 @@ module nsgPe 'br/public:avm/res/network/network-security-group:0.5.3' = {
     tags: tags
     diagnosticSettings: diagnosticSettings
     securityRules: [
+      jumpServerRule
       {
         name: 'AllowSmbInbound'
         properties: {
@@ -300,6 +320,7 @@ module nsgImgBuild 'br/public:avm/res/network/network-security-group:0.5.3' = {
     tags: tags
     diagnosticSettings: diagnosticSettings
     securityRules: [
+      jumpServerRule
       {
         name: 'AllowImageBuilderProxyInbound'
         properties: {
