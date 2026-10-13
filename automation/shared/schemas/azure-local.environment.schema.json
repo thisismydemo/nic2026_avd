@@ -1577,6 +1577,88 @@
         }
       }
     },
+    "demo_vm_lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Azure Local outline 4.4 VM lifecycle through Arc (resource inventory A10, storage-design.md section 5): the VM automation/demo/azure-local/scripts/Invoke-ArcVmLifecycleDemo.ps1 creates, inspects and deletes (-Stage Create | Show | Remove; -Target Live | Rehearsal). No static IP and no NIC NSG: the NIC takes a pool address and the logical network's NSG applies. Local administrator comes from workload_vms.local_admin_*_secret.",
+      "required": [
+        "name",
+        "computer_name",
+        "image",
+        "logical_network",
+        "storage_path",
+        "vcpu",
+        "memory_mb",
+        "security_type",
+        "workload_tag"
+      ],
+      "dependentRequired": {
+        "rehearsal_vm": [
+          "rehearsal_computer_name"
+        ],
+        "rehearsal_computer_name": [
+          "rehearsal_vm"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^vm-[a-z0-9-]+$",
+          "description": "Live target: created and deleted on stage."
+        },
+        "computer_name": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]{1,15}$"
+        },
+        "rehearsal_vm": {
+          "type": "string",
+          "pattern": "^vm-[a-z0-9-]+$",
+          "description": "Rehearsal target, kept running for the inspect step; -Target Rehearsal builds it."
+        },
+        "rehearsal_computer_name": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]{1,15}$"
+        },
+        "rehearsal_purpose_tag": {
+          "type": "string",
+          "pattern": "^[a-z0-9.-]+$",
+          "description": "purpose tag merged on the rehearsal VM, NIC and disks."
+        },
+        "image": {
+          "type": "string",
+          "pattern": "^img-[a-z0-9-]+$"
+        },
+        "logical_network": {
+          "type": "string",
+          "pattern": "^lnet-[a-z0-9-]+$",
+          "description": "Must be one of logical_networks[].name (the script reads its NSG and pool from there)."
+        },
+        "storage_path": {
+          "type": "string",
+          "pattern": "^sp-[a-z0-9-]+$"
+        },
+        "vcpu": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "memory_mb": {
+          "type": "integer",
+          "minimum": 1024
+        },
+        "security_type": {
+          "enum": [
+            "TrustedLaunch"
+          ],
+          "description": "The script always enables secure boot and vTPM, so only Trusted launch is consistent."
+        },
+        "workload_tag": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$",
+          "description": "Value of the workload tag on the VM, NIC and disks."
+        }
+      }
+    },
     "sofs_cluster": {
       "type": "object",
       "additionalProperties": false,
