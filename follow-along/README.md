@@ -635,7 +635,7 @@ Replace the placeholders in the commands with your own values:
 1. **Run a heartbeat query.** Show the last heartbeat per host.
 
    ```powershell
-   Heartbeat | where TimeGenerated > ago(1h) | summarize last = max(TimeGenerated) by Computer | order by Computer asc
+   Heartbeat | where TimeGenerated > ago(1h) | summarize LastHeartbeat = max(TimeGenerated) by Computer | order by Computer asc
    ```
 
    - You should see: Every host you expect, with a recent last heartbeat.
