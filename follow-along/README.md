@@ -209,6 +209,39 @@ Replace the placeholders in the commands with your own values:
 
 **In the repo:** `automation/landing-zones/avd`
 
+### Publish apps live: a RemoteApp application group on Terminal A
+
+**Goal:** Publish applications with RemoteApp on an existing pooled host pool, in the portal or with the script in the repo.
+
+**You need**
+
+- A pooled host pool with at least one Available session host and a workspace
+- Owner or User Access Administrator on the resource group (for the assignment)
+- The repo, pwsh 7, Az modules
+
+**Steps**
+
+1. **Portal: create the RemoteApp group.** Azure Virtual Desktop > Application groups > + Create: your host pool, type RemoteApp; Applications: + Add applications from the Start menu; Assignments: your users group; Workspace: register. Review + create.
+   - You should see: The group lists the apps; the workspace references it; the assigned users see the apps after a feed refresh.
+2. **Script: publish the apps.** Set remote_apps in environment/avd/environment.yml (pool, group name, assigned group, Start menu item names), run the plan, then -Execute.
+
+   ```powershell
+   ./automation/avd/control-plane/scripts/New-AvdRemoteApps.ps1 -Execute
+   ```
+
+   - You should see: The script prints the group, each app 'published' and the workspace with one more reference.
+
+**Troubleshooting**
+
+- Apps not in the feed: the pool's preferred application group type is Desktop and the user also has the desktop; use a separate group or set the preferred type to RemoteApp.
+- Start menu item not found: the script lists the available names; Store apps (Notepad, Calculator, Paint on Windows 11) are not in the list.
+
+**Clean up**
+
+- New-AvdRemoteApps.ps1 -Remove -Execute.
+
+**In the repo:** `automation/avd/control-plane`
+
 ### Sizing AVD on Azure Local: the two public guides and the demo's numbers
 
 **Goal:** Size an AVD solution on Azure Local bottom-up for your own users: session hosts and the SOFS that serves the FSLogix profiles.
@@ -476,6 +509,51 @@ Replace the placeholders in the commands with your own values:
 - None; what-if creates nothing.
 
 **In the repo:** `automation/avd/control-plane`
+
+### Security across the three terminals: one portal walk
+
+**Goal:** Check the same security controls on your own AVD environment.
+
+**You need**
+
+- An AVD host pool with session hosts (Azure VMs and/or Arc-enabled machines)
+- Microsoft Defender for Cloud with Defender for Servers and Defender for Storage on the subscriptions
+- A Log Analytics workspace with Microsoft Sentinel and Windows security events collected by the Azure Monitor Agent
+
+**Steps**
+
+1. **Host pool: device redirection.** Azure Virtual Desktop > Host pools > your pool > RDP Properties > Device redirection: turn off what you do not need (drives, printers, cameras, smart cards).
+
+   ```powershell
+   Get-AzWvdHostPool -ResourceGroupName <rg> -Name <host pool> | Select-Object Name, CustomRdpProperty
+   ```
+
+   - You should see: CustomRdpProperty contains drivestoredirect:s:; redirectprinters:i:0; camerastoredirect:s:
+2. **Defender for Cloud: plans and inventory.** Defender for Cloud > Environment settings > your subscription: Servers Plan 2 and Storage On. Then Inventory, search for your hosts.
+
+   ```powershell
+   Get-AzSecurityPricing | Where-Object PricingTier -eq Standard | Select-Object Name, SubPlan
+   ```
+
+   - You should see: VirtualMachines Standard P2 and StorageAccounts Standard DefenderForStorageV2; every session host is listed in Inventory.
+3. **Sentinel: security events per host.** Log Analytics workspace > Logs: run the step 4 query with your host name prefix.
+
+   ```powershell
+   SecurityEvent | where TimeGenerated > ago(1h) | where Computer has "<host prefix>" | summarize count() by Computer
+   ```
+
+   - You should see: One row per session host.
+
+**Troubleshooting**
+
+- A host missing from SecurityEvent: check that it is associated with the Windows security events data collection rule and that the Azure Monitor Agent extension succeeded.
+- An Arc machine without MDE.Windows: Defender for Servers onboards Defender for Endpoint on supported server and multi-session operating systems; onboard single-session Windows client machines with Intune or the Defender for Endpoint onboarding package.
+
+**Clean up**
+
+- Nothing to clean up (read-only).
+
+**In the repo:** `automation/shared/security`, `design/shared/security-operations.md`
 
 ### Connecting flight 1: three host pools, one workspace
 
