@@ -278,7 +278,7 @@ Replace the placeholders in the commands with your own values:
 
 **You need**
 
-- A Windows 11 Enterprise VM on your hypervisor
+- A Windows 11 Enterprise (single-session) VM on your hypervisor; multi-session is not supported on Hybrid
 - Rights to onboard Arc machines and a host pool created without VMs
 
 **Steps**
@@ -347,7 +347,7 @@ Replace the placeholders in the commands with your own values:
 
 - A standard host pool created without VMs and with a managed identity
 - Reader for that identity on the Arc resource group
-- An Arc-enabled, Entra-joined Windows 11 Enterprise VM
+- An Arc-enabled Windows 11 Enterprise VM joined to AD DS, Entra ID or both (hybrid); this lab joins AD DS
 - Az.DesktopVirtualization and Az.ConnectedMachine
 
 **Steps**
