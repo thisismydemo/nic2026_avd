@@ -6,9 +6,9 @@ Thirteen rows, three deployment models. The session slide shows five of these ro
 
 | # | Axis | AVD on Azure | AVD on Azure Local | AVD Hybrid |
 |---|---|---|---|---|
-| 1 | Where compute runs | Azure | Your Azure Local cluster | Your hypervisor (Hyper-V, VMware vSphere, Nutanix AHV) |
+| 1 | Where compute runs | Azure | Your Azure Local cluster | Your hypervisor (Hyper-V, VMware vSphere, Nutanix AHV) or a headless physical server; not a user's laptop or personal PC |
 | 2 | Lifecycle owner | Azure | Azure for the platform through Arc; you for the guest | You, with your hypervisor tools |
-| 3 | Session host OS | Windows 11 Enterprise (single or multi-session); Windows Server | Windows 11 Enterprise multi-session and single-session, Windows 10 Enterprise (both), Windows Server 2025, 2022 and 2019; Azure Local 23H2 or later, registered with Azure | Windows 11 or 10 Enterprise single-session; Windows Server |
+| 3 | Session host OS | Windows 11 Enterprise (single or multi-session); Windows Server | Windows 11 Enterprise multi-session and single-session, Windows 10 Enterprise (both), Windows Server 2025, 2022 and 2019; Azure Local 23H2 or later, registered with Azure | Windows 11 or 10 Enterprise single-session; Windows Server 2016 to 2025 |
 | 4 | Multi-session | Yes (Windows 11 multi-session) | Yes (Windows 11 and Windows 10 Enterprise multi-session) | No |
 | 5 | Join and single sign-on | Entra join with SSO; AD DS and hybrid join also supported | The AVD portal can only join session hosts to AD DS (including hybrid join); native Entra join is supported through PowerShell and other deployment methods | Windows 11 can be Entra-only; Windows Server needs Active Directory |
 | 6 | Profile storage and authentication | Azure Files: Entra Kerberos (hybrid identities in all clouds; cloud-only identities generally available in the public cloud, with client, permissions and storage-application prerequisites; external identities only for FSLogix on AVD), AD DS or Entra Domain Services; a storage account uses one identity source | FSLogix needs an SMB service, not a cluster shared volume: a file server VM or Scale-Out File Server on the cluster, or Azure Files | Any SMB path: Azure Files with Entra Kerberos, or on-premises SMB with AD DS Kerberos |
@@ -25,6 +25,7 @@ Thirteen rows, three deployment models. The session slide shows five of these ro
 - **One workspace, three desktops:** an AVD workspace can expose desktops from all three models to the same user. Group entitlement decides which desktops the user sees; it does not decide which host the user lands on.
 - **One profile pattern:** the same FSLogix configuration and the same user identity give the same container in each model, for sequential use. Roaming a profile is not replication, and replication is not recovery.
 - **Shared monitoring, separate operations:** one Log Analytics workspace sees all three. Patching, power and recovery differ, as rows 8, 9 and 11 show.
+- **RDP Shortpath on Hybrid:** Shortpath is documented for AVD in general and for on-site users of Azure Local; the AVD Hybrid documentation does not mention it, so test it on your network before you rely on it. (Updated 14 October 2026.)
 
 ## Decision rules of thumb
 

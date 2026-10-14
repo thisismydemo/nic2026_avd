@@ -81,7 +81,9 @@ The Azure Virtual Desktop service in Azure is required for brokering, and each h
 - [ ] Each machine is Arc-enabled with the Azure Connected Machine agent, and the Arc endpoints are allowed.
 - [ ] A host pool registration key is generated.
 - [ ] The Azure Virtual Desktop Arc extension (`CloudDeviceExtension`, publisher `Microsoft.AzureVirtualDesktop`) is installed with the registration token.
+- [ ] Each session host is a VM on your hypervisor or a headless physical server, not a user's laptop or personal PC.
 - [ ] You can deploy and power-manage the VMs with your hypervisor tools.
+- [ ] If on-site users should use RDP Shortpath, you have tested it: the AVD Hybrid documentation does not cover it.
 
 Facts to plan around:
 

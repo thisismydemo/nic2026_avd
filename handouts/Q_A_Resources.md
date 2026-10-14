@@ -118,6 +118,10 @@ For amounts, use the Azure Virtual Desktop and Azure Local pricing pages.
 | Windows App sign-in error with Conditional Access | Whether a policy blocks the Windows 365 application. |
 | Hosts not scaling | The role on the Azure Virtual Desktop service principal, and that the host pool is not using two scaling tools. |
 
+## Feedback
+
+Please leave feedback on the session in the NIC app, or pick up the green card on your way out and drop it in the bucket. Questions after the session are welcome in the hallway.
+
 ## Resources
 
 Microsoft Learn topics:
