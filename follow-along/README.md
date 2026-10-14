@@ -16,91 +16,48 @@ Replace the placeholders in the commands with your own values:
 
 ## Follow along
 
-### One workspace, three host pools, all Available
+### Deploy it live: a host pool and a session host on Azure
 
-**Goal:** See your own workspace, host pools and session host status in one view.
-
-**You need**
-
-- An AVD workspace with at least one host pool
-- Az.DesktopVirtualization module
-
-**Steps**
-
-1. **List host pools in the workspace's resource group.** List the host pools and the status of their session hosts.
-
-   ```powershell
-   Get-AzWvdHostPool -ResourceGroupName <rg> | Select-Object Name, HostPoolType, LoadBalancerType
-   Get-AzWvdHostPool -ResourceGroupName <rg> | ForEach-Object { Get-AzWvdSessionHost -ResourceGroupName <rg> -HostPoolName $_.Name | Select-Object Name, Status, Session }
-   ```
-
-   - You should see: Each host pool lists its session hosts with Status Available.
-
-**Troubleshooting**
-
-- Status Unavailable: check the host's network access to the AVD service URLs and the agent version.
-
-**Clean up**
-
-- None; read-only.
-
-**In the repo:** `automation/demo/avd/scripts/Show-AvdState.ps1`
-
-### Identity: three paths, one proof
-
-**Goal:** Enable Entra Kerberos on an Azure Files share and confirm a Windows 11 Entra-joined VM obtains a ticket.
+**Goal:** Create a host pool and add a session host, in the portal or with the scripts in the repo.
 
 **You need**
 
-- An Entra-joined Windows 11 VM
-- A storage account (FileStorage or StorageV2) with a file share
-- Rights to grant admin consent
-- Note: cloud-only identities are supported (GA) for Azure Files with Entra Kerberos; check the current Windows 11 build requirement on Microsoft Learn
+- An Azure subscription with the Microsoft.DesktopVirtualization provider registered
+- A virtual network subnet and an image (marketplace Windows 11 multi-session is fine)
+- The repo, pwsh 7, Az modules
 
 **Steps**
 
-1. **Enable Entra Kerberos on the storage account.** In the portal: Storage account > File shares > Identity-based access > Microsoft Entra Kerberos > Set up. Enable it, then grant admin consent to the generated app registration.
-   - You should see: An app named [Storage Account] <storageaccount>.file.core.windows.net exists with consent granted.
-2. **Allow the ticket to be issued without MFA.** Exclude the storage account's app from Conditional Access policies that require MFA; the ticket request is silent and cannot prompt.
-   - You should see: The app appears under Exclude in the policy.
-3. **Enable cloud-only group support.** In the app registration manifest add the tag kdc_enable_cloud_group_sids. Use security groups that are not nested.
-   - You should see: The tag appears in the manifest tags array.
-4. **Enable ticket retrieval on the client.** Set the registry value that lets the client request the Entra Kerberos ticket and restart the client.
+1. **Portal: create the host pool.** Azure Virtual Desktop > Host pools > + Create: pooled, breadth-first; on Virtual machines add one VM (image, size, Entra join); on Workspace register the desktop application group. Review + create.
+   - You should see: The pool, its desktop application group and the workspace registration exist; the VM shows Available under Session hosts.
+2. **Script: create the host pool.** Set live_host_pool in environment/avd/environment.yml to your names, then run the script.
 
    ```powershell
-   reg add HKLM\SYSTEM\CurrentControlSet\Control\Lsa\Kerberos\Parameters /v CloudKerberosTicketRetrievalEnabled /t REG_DWORD /d 1 /f
+   ./automation/avd/control-plane/scripts/New-AvdLiveHostPool.ps1 -Execute
    ```
 
-   - You should see: Value is 1.
-5. **Assign share-level permission.** Assign Storage File Data SMB Share Contributor to your users group on the share.
+   - You should see: The script prints the host pool, the application group and the workspace with one more reference.
+3. **Script: add a session host.** Copy the example parameter file, set your names, deploy, then register the VM to the pool with a token generated at run time.
 
    ```powershell
-   New-AzRoleAssignment -ObjectId <group object id> -RoleDefinitionName 'Storage File Data SMB Share Contributor' -Scope <share resource id>
+   ./automation/avd/session-hosts-azure/scripts/Invoke-SessionHostsAzureDeploy.ps1 -Mode Bicep -SubscriptionId <sub> -ResourceGroupName <rg> -ParameterFile <your parameter file> -AdminUsernameRef keyvault://<vault>/<secret> -AdminPasswordRef keyvault://<vault>/<secret> -Execute
    ```
 
-   - You should see: The role assignment lists on the share.
-6. **Request the ticket.** Restart the client, then sign in again to the VM as an Entra user (the registry value takes effect at sign-in) and request a ticket for the storage account.
-
-   ```powershell
-   klist get cifs/<storageaccount>.file.core.windows.net
-   ```
-
-   - You should see: klist shows a ticket for the cifs service of the storage account.
+   - You should see: The new VM shows Available under the host pool's Session hosts.
 
 **Troubleshooting**
 
-- No ticket: check the client is Entra-joined or hybrid-joined, the registry value, and the MFA exclusion.
-- Access denied after the ticket: check the share-level role and the NTFS ACL.
+- Host stays Unavailable: check outbound 443 to the AVD endpoints and that the registration token was not expired.
 
 **Clean up**
 
-- Remove the role assignment and disable Entra Kerberos on the storage account if it was a test.
+- New-AvdLiveHostPool.ps1 -Remove -Execute; delete the VM and its NIC and disk.
 
-**In the repo:** `automation/landing-zones/avd/scripts/Set-AvdStorageEntraKerberos.ps1`, `handouts/Identity_Reference_Architecture.md`
+**In the repo:** `automation/avd/control-plane`, `automation/avd/session-hosts-azure`
 
 ### AVD on Azure: host pool and session hosts
 
-**Goal:** Create a pooled host pool, desktop application group and workspace.
+**Goal:** Create a pooled host pool, desktop application group and workspace. The pool has no session hosts yet: add one from the host pool (Session hosts > Add) with the marketplace image, or with your own image from the next demo; the Insights and DCR demos need it
 
 **You need**
 
@@ -151,7 +108,7 @@ Replace the placeholders in the commands with your own values:
 
 ### One image artifact: Image Builder to gallery to host pool
 
-**Goal:** Build a Windows 11 multi-session image with Azure Image Builder into a Compute Gallery.
+**Goal:** Build a Windows 11 multi-session image with Azure Image Builder into a Compute Gallery. The build takes 45 to 90 minutes: start it and move on
 
 **You need**
 
@@ -202,7 +159,7 @@ Replace the placeholders in the commands with your own values:
 
 ### AVD Insights
 
-**Goal:** Enable AVD Insights for a host pool.
+**Goal:** Enable AVD Insights for a host pool. Needs a session host from the host-pool demo, running long enough to send data (best the next day)
 
 **You need**
 
@@ -228,7 +185,7 @@ Replace the placeholders in the commands with your own values:
 
 ### Data collection rules that keep costs sane
 
-**Goal:** Measure what your session hosts cost to monitor and keep only what you need.
+**Goal:** Measure what your session hosts cost to monitor and keep only what you need. Needs a session host from the host-pool demo, running long enough to send data (best the next day)
 
 **You need**
 
@@ -252,7 +209,7 @@ Replace the placeholders in the commands with your own values:
 
 **In the repo:** `automation/landing-zones/avd`
 
-### Sizing AVD on Azure Local: the two public guides and this lab's numbers
+### Sizing AVD on Azure Local: the two public guides and the demo's numbers
 
 **Goal:** Size an AVD solution on Azure Local bottom-up for your own users: session hosts and the SOFS that serves the FSLogix profiles.
 
@@ -281,6 +238,35 @@ Replace the placeholders in the commands with your own values:
 - None: nothing is deployed.
 
 **In the repo:** `handouts/Platform_Comparison.md`
+
+### Deploy it live: an AVD Hybrid session host
+
+**Goal:** Turn a Windows VM on any hypervisor into an AVD Hybrid session host with the scripts in the repo.
+
+**You need**
+
+- A Windows 11 Enterprise VM on your hypervisor
+- Rights to onboard Arc machines and a host pool created without VMs
+
+**Steps**
+
+1. **Script: build and register.** Describe the VM in hybrid.vms in environment/avd/environment.yml (or use your own VM and the Arc and extension steps of the earlier demos).
+
+   ```powershell
+   ./automation/avd/session-hosts-hybrid/scripts/Invoke-HybridHostBuild.ps1 -EnvironmentFile environment/avd/environment.yml -VmName <vm name> -Execute
+   ```
+
+   - You should see: The build ends with Registered True, Status Available.
+
+**Troubleshooting**
+
+- Host never Available: check the Arc agent is Connected and the extension log under C:\Packages\Plugins.
+
+**Clean up**
+
+- Remove the session host from the pool, the Arc machine and the VM.
+
+**In the repo:** `automation/avd/session-hosts-hybrid`
 
 ### Plain Hyper-V VMs seen in Azure only as Arc machines
 
@@ -365,6 +351,58 @@ Replace the placeholders in the commands with your own values:
 - Remove the extension and the session host from the pool.
 
 **In the repo:** `automation/avd/session-hosts-hybrid/scripts/Register-HybridHosts.ps1`
+
+### Identity: three paths, one proof
+
+**Goal:** Enable Entra Kerberos on an Azure Files share and confirm a Windows 11 Entra-joined VM obtains a ticket.
+
+**You need**
+
+- An Entra-joined Windows 11 VM
+- A storage account (FileStorage or StorageV2) with a file share
+- Rights to grant admin consent
+- Note: cloud-only identities are supported (GA) for Azure Files with Entra Kerberos; check the current Windows 11 build requirement on Microsoft Learn
+
+**Steps**
+
+1. **Enable Entra Kerberos on the storage account.** In the portal: Storage account > File shares > Identity-based access > Microsoft Entra Kerberos > Set up. Enable it, then grant admin consent to the generated app registration.
+   - You should see: An app named [Storage Account] <storageaccount>.file.core.windows.net exists with consent granted.
+2. **Allow the ticket to be issued without MFA.** Exclude the storage account's app from Conditional Access policies that require MFA; the ticket request is silent and cannot prompt.
+   - You should see: The app appears under Exclude in the policy.
+3. **Enable cloud-only group support.** In the app registration manifest add the tag kdc_enable_cloud_group_sids. Use security groups that are not nested.
+   - You should see: The tag appears in the manifest tags array.
+4. **Enable ticket retrieval on the client.** Set the registry value that lets the client request the Entra Kerberos ticket and restart the client.
+
+   ```powershell
+   reg add HKLM\SYSTEM\CurrentControlSet\Control\Lsa\Kerberos\Parameters /v CloudKerberosTicketRetrievalEnabled /t REG_DWORD /d 1 /f
+   ```
+
+   - You should see: Value is 1.
+5. **Assign share-level permission.** Assign Storage File Data SMB Share Contributor to your users group on the share.
+
+   ```powershell
+   New-AzRoleAssignment -ObjectId <group object id> -RoleDefinitionName 'Storage File Data SMB Share Contributor' -Scope <share resource id>
+   ```
+
+   - You should see: The role assignment lists on the share.
+6. **Request the ticket.** Restart the client, then sign in again to the VM as an Entra user (the registry value takes effect at sign-in) and request a ticket for the storage account.
+
+   ```powershell
+   klist get cifs/<storageaccount>.file.core.windows.net
+   ```
+
+   - You should see: klist shows a ticket for the cifs service of the storage account.
+
+**Troubleshooting**
+
+- No ticket: check the client is Entra-joined or hybrid-joined, the registry value, and the MFA exclusion.
+- Access denied after the ticket: check the share-level role and the NTFS ACL.
+
+**Clean up**
+
+- Remove the role assignment and disable Entra Kerberos on the storage account if it was a test.
+
+**In the repo:** `automation/landing-zones/avd/scripts/Set-AvdStorageEntraKerberos.ps1`, `handouts/Identity_Reference_Architecture.md`
 
 ### The profile share, per-user containers and the settings that make them portable
 
@@ -678,6 +716,36 @@ Replace the placeholders in the commands with your own values:
 
 **In the repo:** `automation/landing-zones/avd/README.md`, `automation/landing-zones/avd/solution.yml`
 
+### Deploy it live: a session host on Azure Local
+
+**Goal:** Understand how a session host is added on Azure Local, in the portal or with the script; the steps need an Azure Local cluster.
+
+**You need**
+
+- An Azure Local cluster with an Arc resource bridge, a custom location, a logical network and an image (not required to read)
+
+**Steps**
+
+1. **Portal: add a session host.** Host pool > Session hosts > + Add > Virtual machines: Azure Local, custom location, image, logical network, AD DS join.
+   - You should see: The new Azure Local VM shows Available under the host pool's Session hosts.
+2. **Script: add a session host.** Add the host to azl_session_hosts.hosts in environment/avd/environment.yml, then build only that host.
+
+   ```powershell
+   ./automation/avd/session-hosts-azure-local/scripts/Invoke-AzlSessionHostBuild.ps1 -EnvironmentFile environment/avd/environment.yml -VmName <vm name> -Execute
+   ```
+
+   - You should see: The new VM shows Available under the host pool's Session hosts.
+
+**Troubleshooting**
+
+- Host never Available: check the guest has a default gateway and reaches the AVD endpoints on 443.
+
+**Clean up**
+
+- Delete the VM and its NIC, and remove the session host from the pool.
+
+**In the repo:** `automation/avd/session-hosts-azure-local`
+
 ### AVD on Azure Local: host pool and a session host as an Azure Local VM
 
 **Goal:** Understand how an Azure Local VM becomes an AVD session host; the steps need an Azure Local cluster.
@@ -718,4 +786,36 @@ Replace the placeholders in the commands with your own values:
 **Goal:** Understand GPU by DDA versus GPU partitioning on Azure Local, what the free driver gives (compute and AI) and what desktop graphics acceleration needs (NVIDIA vWS licensing).
 
 **In the repo:** `automation/azure-local/cluster-configure/gpu`
+
+## Watch only
+
+### One workspace, three host pools, every running host Available
+
+**Goal:** Nothing to run yet: this is the end state the session builds. Your hands-on starts at the foundation demo (slide 10); come back to this check once you have host pools
+
+**You need**
+
+- An AVD workspace with at least one host pool
+- Az.DesktopVirtualization module
+
+**Steps**
+
+1. **List host pools in the workspace's resource group.** List the host pools and the status of their session hosts.
+
+   ```powershell
+   Get-AzWvdHostPool -ResourceGroupName <rg> | Select-Object Name, HostPoolType, LoadBalancerType
+   Get-AzWvdHostPool -ResourceGroupName <rg> | ForEach-Object { Get-AzWvdSessionHost -ResourceGroupName <rg> -HostPoolName $_.Name | Select-Object Name, Status, Session }
+   ```
+
+   - You should see: Each host pool lists its session hosts with Status Available.
+
+**Troubleshooting**
+
+- Status Unavailable: check the host's network access to the AVD service URLs and the agent version.
+
+**Clean up**
+
+- None; read-only.
+
+**In the repo:** `automation/demo/avd/scripts/Show-AvdState.ps1`
 
