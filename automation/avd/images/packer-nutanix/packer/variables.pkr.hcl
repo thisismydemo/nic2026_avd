@@ -1,4 +1,4 @@
-# Reference template, not run in the lab.
+# Reference template, not run end to end.
 
 variable "customizer_directory" {
   type    = string

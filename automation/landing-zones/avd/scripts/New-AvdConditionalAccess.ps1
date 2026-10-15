@@ -29,7 +29,7 @@ Provider app and Windows 365 are refused.
 .PARAMETER Execute
 Permits changes. Without this switch, the script runs in WhatIf mode.
 .EXAMPLE
-./New-AvdConditionalAccess.ps1 -TenantId '00000000-0000-0000-0000-000000000000' -UsersGroupName 'grp-<org>-<lab>-avd-users' -NamePrefix 'CA-<org>-<lab>' -Execute
+./New-AvdConditionalAccess.ps1 -TenantId '00000000-0000-0000-0000-000000000000' -UsersGroupName 'grp-<org>-<token>-avd-users' -NamePrefix 'CA-<org>-<token>' -Execute
 #>
 [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
 param(

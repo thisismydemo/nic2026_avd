@@ -23,7 +23,7 @@ BeforeAll {
     function global:Resolve-NIC26KeyVaultRef {
         param([string]$Ref, [switch]$AsPlainText)
         if ($Ref -like '*username*') { return 'Administrator' }
-        if ($Ref -like '*password*') { return (ConvertTo-SecureString 'PrivateLabSecret' -AsPlainText -Force) }
+        if ($Ref -like '*password*') { return (ConvertTo-SecureString 'PrivateSecret' -AsPlainText -Force) }
         return [Convert]::ToBase64String([byte[]](1, 2, 3))
     }
     function global:Get-VMSwitch {
@@ -130,18 +130,18 @@ Describe 'Hybrid pure functions' {
     }
 
     It 'produces well-formed unattend XML without the plaintext password' {
-        $password = ConvertTo-SecureString 'PrivateLabSecret' -AsPlainText -Force
+        $password = ConvertTo-SecureString 'PrivateSecret' -AsPlainText -Force
         $xmlText = New-HybridUnattendXml -ComputerName 'Host01' -TimeZone 'UTC' -LocalAdminUsername 'Administrator' -LocalAdminPassword $password
         { [void][xml]$xmlText } | Should -Not -Throw
         $xmlText | Should -Match 'Host01'
-        $xmlText | Should -Match ([regex]::Escape([Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes('PrivateLabSecretPassword'))))
-        $xmlText | Should -Not -Match 'PrivateLabSecret<'
-        $xmlText | Should -Not -Match '>PrivateLabSecret'
+        $xmlText | Should -Match ([regex]::Escape([Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes('PrivateSecretPassword'))))
+        $xmlText | Should -Not -Match 'PrivateSecret<'
+        $xmlText | Should -Not -Match '>PrivateSecret'
         { New-HybridUnattendXml -ComputerName 'SixteenCharNameX' -TimeZone 'UTC' -LocalAdminUsername 'Administrator' -LocalAdminPassword $password } | Should -Throw
     }
 
     It 'gives every unattend component its full identity and avoids the deprecated OOBE skips' {
-        $password = ConvertTo-SecureString 'PrivateLabSecret' -AsPlainText -Force
+        $password = ConvertTo-SecureString 'PrivateSecret' -AsPlainText -Force
         $document = [xml](New-HybridUnattendXml -ComputerName 'Host01' -TimeZone 'UTC' -LocalAdminUsername 'Administrator' -LocalAdminPassword $password)
         $namespaceManager = [System.Xml.XmlNamespaceManager]::new($document.NameTable)
         $namespaceManager.AddNamespace('u', 'urn:schemas-microsoft-com:unattend')
@@ -206,7 +206,7 @@ Describe 'New-HybridVm' {
             'Set-VMNetworkAdapter', 'Set-VMNetworkAdapterVlan', 'Set-VM', 'Add-ClusterVirtualMachineRole',
             'Set-ClusterOwnerNode', 'Get-ClusterGroup')
         ($global:HybridTestCalls -join ',') | Should -Be ($expected -join ',')
-        ($streams | Out-String) | Should -Not -Match 'PrivateLabSecret'
+        ($streams | Out-String) | Should -Not -Match 'PrivateSecret'
         $global:HybridTestCalls | Should -Not -Contain 'Start-VM'
     }
 
@@ -285,14 +285,14 @@ Describe 'Remove-HybridVm' {
 
 Describe 'Sync-HybridGuardianCertificates' {
     It 'refuses to export private keys onto a cluster shared volume' {
-        $password = ConvertTo-SecureString 'PrivateLabSecret' -AsPlainText -Force
+        $password = ConvertTo-SecureString 'PrivateSecret' -AsPlainText -Force
         { & $script:syncScript -Direction Export -Path 'C:\ClusterStorage\Volume1\pfx' -PfxPassword $password -Execute } | Should -Throw '*cluster shared volume*'
     }
 
     It 'prints a plan without touching the store and never prints the password' {
-        $password = ConvertTo-SecureString 'PrivateLabSecret' -AsPlainText -Force
+        $password = ConvertTo-SecureString 'PrivateSecret' -AsPlainText -Force
         $output = & $script:syncScript -Direction Export -Path (Join-Path $TestDrive 'pfx') -PfxPassword $password *>&1
-        ($output | Out-String) | Should -Not -Match 'PrivateLabSecret'
+        ($output | Out-String) | Should -Not -Match 'PrivateSecret'
         @($output)[0].Step | Should -Be 'Export'
     }
 }

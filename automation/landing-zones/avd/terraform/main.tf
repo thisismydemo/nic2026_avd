@@ -25,7 +25,7 @@ locals {
   }
 
   diag = {
-    lab = { workspace_resource_id = var.log_analytics_workspace_id }
+    law = { workspace_resource_id = var.log_analytics_workspace_id }
   }
 
   shortpath_sources = concat([var.p2s_pool], var.onprem_compute_prefixes)
@@ -761,9 +761,9 @@ module "gallery" {
   enable_telemetry    = false
 
   role_assignments = {
-    lab_operators_reader = {
+    platform_operators_reader = {
       role_definition_id_or_name = "Reader"
-      principal_id               = var.group_object_ids.lab_operators
+      principal_id               = var.group_object_ids.platform_operators
       principal_type             = "Group"
     }
   }
@@ -882,7 +882,7 @@ module "dcr_avd_insights" {
   destinations = {
     log_analytics = [
       {
-        name                  = "lawLab"
+        name                  = "lawMain"
         workspace_resource_id = var.log_analytics_workspace_id
       },
     ]
@@ -891,7 +891,7 @@ module "dcr_avd_insights" {
   data_flows = [
     {
       streams      = ["Microsoft-Perf", "Microsoft-Event"]
-      destinations = ["lawLab"]
+      destinations = ["lawMain"]
     },
   ]
 }
@@ -985,7 +985,7 @@ resource "azurerm_subscription_policy_assignment" "allowed_locations" {
   count = (var.deploy_platform_scope_items && var.enable_policy_assignments) ? 1 : 0
 
   name                 = var.names["asg_allowed_locations"]
-  display_name         = "AVD lab: allowed locations"
+  display_name         = "AVD landing zone: allowed locations"
   subscription_id      = local.subscription_scope
   policy_definition_id = data.azurerm_policy_definition.builtin["allowed_locations"].id
   enforce              = true
@@ -998,7 +998,7 @@ resource "azurerm_subscription_policy_assignment" "require_tags" {
   for_each = (var.deploy_platform_scope_items && var.enable_policy_assignments) ? toset(local.governed_tags) : toset([])
 
   name                 = "${var.names["asg_require_tags"]}-${each.key}"
-  display_name         = "AVD lab: require tag ${each.key} on resource groups"
+  display_name         = "AVD landing zone: require tag ${each.key} on resource groups"
   subscription_id      = local.subscription_scope
   policy_definition_id = data.azurerm_policy_definition.builtin["require_tag_on_rg"].id
   enforce              = true
@@ -1009,7 +1009,7 @@ resource "azurerm_subscription_policy_assignment" "inherit_tags" {
   for_each = (var.deploy_platform_scope_items && var.enable_policy_assignments) ? toset(local.governed_tags) : toset([])
 
   name                 = "${var.names["asg_inherit_tags"]}-${each.key}"
-  display_name         = "AVD lab: inherit tag ${each.key} from the resource group"
+  display_name         = "AVD landing zone: inherit tag ${each.key} from the resource group"
   subscription_id      = local.subscription_scope
   policy_definition_id = data.azurerm_policy_definition.builtin["inherit_tag_from_rg"].id
   location             = var.location
@@ -1034,7 +1034,7 @@ resource "azurerm_subscription_policy_assignment" "storage_hygiene" {
   for_each = (var.deploy_platform_scope_items && var.enable_policy_assignments) ? { "1" = "storage_public_access", "2" = "storage_secure_transfer" } : {}
 
   name                 = "${var.names["asg_storage_hygiene"]}-${each.key}"
-  display_name         = "AVD lab: storage hygiene (${each.key})"
+  display_name         = "AVD landing zone: storage hygiene (${each.key})"
   subscription_id      = local.subscription_scope
   policy_definition_id = data.azurerm_policy_definition.builtin[each.value].id
   enforce              = true
@@ -1045,7 +1045,7 @@ resource "azurerm_resource_group_policy_assignment" "hosts_no_public_ip" {
   count = (var.deploy_platform_scope_items && var.enable_policy_assignments) ? 1 : 0
 
   name                 = var.names["asg_no_public_ip"]
-  display_name         = "AVD lab: no public IPs on session hosts"
+  display_name         = "AVD landing zone: no public IPs on session hosts"
   resource_group_id    = module.resource_groups["hosts"].resource_id
   policy_definition_id = data.azurerm_policy_definition.builtin["nic_no_public_ip"].id
   enforce              = true
@@ -1057,7 +1057,7 @@ resource "azurerm_resource_group_policy_assignment" "hosts_no_public_ip" {
 resource "azurerm_role_definition" "aib_image" {
   name        = var.names["role_aib_image"]
   scope       = local.subscription_scope
-  description = "Azure Image Builder: read the gallery and definitions, write image versions and managed images (lab)"
+  description = "Azure Image Builder: read the gallery and definitions, write image versions and managed images"
 
   permissions {
     actions = [

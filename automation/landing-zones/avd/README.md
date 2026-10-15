@@ -26,7 +26,7 @@ Not in this solution (owned elsewhere): AVD workspace/host pools/app groups/scal
 
 ## Inputs and outputs
 
-The single source is [`solution.yml`](solution.yml): every input (canonical names from the design variables table, `path:` where the environment schema key differs, e.g. `lab_token -> token`, `p2s_pool -> p2s_client_pool`, `image_definitions -> images.image_definitions`) and every output. Bicep parameters, Terraform variables and outputs mirror it one-to-one (`tests/LzAvd.Parity.Tests.ps1`). Names come only from the `names:` catalog (contract §10) and reach IaC as the `names` object.
+The single source is [`solution.yml`](solution.yml): every input (canonical names from the design variables table, `path:` where the environment schema key differs, e.g. `naming_token -> token`, `p2s_pool -> p2s_client_pool`, `image_definitions -> images.image_definitions`) and every output. Bicep parameters, Terraform variables and outputs mirror it one-to-one (`tests/LzAvd.Parity.Tests.ps1`). Names come only from the `names:` catalog (contract §10) and reach IaC as the `names` object.
 
 Inputs added beyond the design table (reported to the owner): `bastion_subnet_prefix` (admin RDP source; design named it without a variable), `owner_email`, `enable_dns_private_resolver`, `enable_backup`, `enable_policy_assignments`, `link_privatelink_zone_to_hub`, `arc_onboard_sp_object_id`. These flags are supported by `automation/shared/schemas/avd.environment.schema.json`. The additional `deploy_platform_scope_items` flag defaults to false and gates platform-owned delivery.
 
@@ -36,14 +36,14 @@ Outputs consumed downstream: resource group names, subnet ids, `dns_resolver_inb
 
 Nothing environment-specific is written in the code. Every name, region, address range, identity and size comes from one of three places, and the same values drive the Bicep and the Terraform track:
 
-1. **Your environment config** (`environment/shared/*.yml` and `environment/avd/*.yml`, validated by the schemas in `automation/shared/schemas`). Start from the `main.example.bicepparam` and `terraform.example.tfvars.json` files next to the code: they use the placeholder organisation `iic`, the lab token `nic26`, all-zero GUIDs and the `contoso.com` domain. Replace them with your own values.
-2. **The name catalog** (the `names:` section of `solution.yml`). Resource names are generated from `org`, `lab_token` and `location_short` by the shared naming module, never typed in code. Peering names are derived from the VNet names in the catalog.
-3. **Script parameters.** The Entra and clean-up scripts take `-Org`, `-LabToken`, `-Users`, `-Domain`, `-KeyVaultName` and `-SecretNamePrefix` as mandatory parameters; there are no lab defaults to forget to change.
+1. **Your environment config** (`environment/shared/*.yml` and `environment/avd/*.yml`, validated by the schemas in `automation/shared/schemas`). Start from the `main.example.bicepparam` and `terraform.example.tfvars.json` files next to the code: they use the placeholder organisation `iic`, the naming token `nic26`, all-zero GUIDs and the `contoso.com` domain. Replace them with your own values.
+2. **The name catalog** (the `names:` section of `solution.yml`). Resource names are generated from `org`, `naming_token` and `location_short` by the shared naming module, never typed in code. Peering names are derived from the VNet names in the catalog.
+3. **Script parameters.** The Entra and clean-up scripts take `-Org`, `-NamingToken`, `-Users`, `-Domain`, `-KeyVaultName` and `-SecretNamePrefix` as mandatory parameters; there are no built-in defaults to forget to change.
 
 | Variable | Type | Required | Default | Where to set it | What it does |
 |---|---|---|---|---|---|
 | `org` | string | required |  | your environment config (`environment/`) | Organization token in every name (D-006). |
-| `lab_token` | string | required |  | your environment config (`environment/`) | Lab/conference token in every name (D-005); shared schema key `token`. |
+| `naming_token` | string | required |  | your environment config (`environment/`) | Naming token in every name (D-005); shared schema key `token`. |
 | `location` | string | required |  | your environment config (`environment/`) | Azure region for every regional resource (D-010). |
 | `location_short` | string | required |  | your environment config (`environment/`) | Short region token used in names. |
 | `tenant_id` | string | required |  | your environment config (`environment/`) | Entra tenant id (D-002). |
@@ -55,9 +55,9 @@ Nothing environment-specific is written in the code. Every name, region, address
 | `names` | map | required |  | generated (name catalog or another solution) | Name catalog resolved by ConvertTo-NIC26BicepParam / ConvertTo-NIC26TfVars from the names section below (contract 10). |
 | `hub_vnet_id` | string | required |  | your environment config (`environment/`) | Existing hub VNet resource id (connectivity subscription). The hub-side peering is the only change made to it. |
 | `hub_address_space` | string | required |  | your environment config (`environment/`) | Hub address space (reference for NSG sanity checks). |
-| `identity_spoke_vnet_id` | string | required |  | your environment config (`environment/`) | Existing identity spoke VNet id; receives a link to the lab's privatelink.file zone (P-11). |
+| `identity_spoke_vnet_id` | string | required |  | your environment config (`environment/`) | Existing identity spoke VNet id; receives a link to the privatelink.file zone (P-11). |
 | `p2s_pool` | string | required |  | your environment config (`environment/`) | Point-to-site client pool (presenter path, D-018) for the Shortpath NSG rule; shared schema key `p2s_client_pool`. |
-| `bastion_subnet_prefix` | string | required |  | your environment config (`environment/`) | Existing AzureBastionSubnet prefix; admin RDP source for the hosts NSG (design 4.6). The lab jump server is covered by azl_spoke_prefix. |
+| `bastion_subnet_prefix` | string | required |  | your environment config (`environment/`) | Existing AzureBastionSubnet prefix; admin RDP source for the hosts NSG (design 4.6). The jump server is covered by azl_spoke_prefix. |
 | `onprem_compute_prefixes` | list | required |  | your environment config (`environment/`) | On-prem session-host ranges (AVD-hosts VLAN per P-08 plus the Azure Local AVD lnet range) allowed to the private endpoint. |
 | `azl_spoke_vnet_id` | string | required |  | your environment config (`environment/`) | Azure Local spoke VNet id (lz-azure-local output) for the direct spoke-to-spoke peering and the zone link. |
 | `azl_spoke_prefix` | string | required |  | your environment config (`environment/`) | Azure Local spoke prefix (NSG rules; also the admin source for the jump server). |
@@ -69,7 +69,7 @@ Nothing environment-specific is written in the code. Every name, region, address
 | `enable_private_endpoints` | bool | optional | `False` | your environment config (`environment/`) | Owner decision D-029: false (default) = Azure Files on its public endpoint; no privatelink zone, links or resolver. true restores the private-endpoint design. |
 | `enable_dns_private_resolver` | bool | optional | `True` | your environment config (`environment/`) | Deploy the DNS Private Resolver inbound endpoint (AVD-LZ-06 / P-07 option B). Set false for the DC conditional-forwarder option. ADDED flag; not yet in avd.environment.schema.json. |
 | `dns_resolver_inbound_ip` | string | required |  | your environment config (`environment/`) | Static IP of the resolver inbound endpoint inside the dnsin subnet; handed back to the Azure Local design for lnet DNS. |
-| `privatelink_file_zone_id` | string | optional | (empty) | your environment config (`environment/`) | Existing privatelink.file.core.windows.net zone id to reuse; empty creates the lab's own zone (P-11). |
+| `privatelink_file_zone_id` | string | optional | (empty) | your environment config (`environment/`) | Existing privatelink.file.core.windows.net zone id to reuse; empty creates its own zone (P-11). |
 | `link_privatelink_zone_to_hub` | bool | optional | `False` | your environment config (`environment/`) | Also link the zone to the hub VNet (design 4.5 lists the hub; P-11 lists the identity VNet). ADDED flag; not yet in the schema. |
 | `share_names` | map | required |  | your environment config (`environment/`) | FSLogix share names keyed profiles and odfc (naming standard 5). |
 | `share_quota_gib` | int | optional | `256` | your environment config (`environment/`) | Provisioned size per share in GiB. |
@@ -78,7 +78,7 @@ Nothing environment-specific is written in the code. Every name, region, address
 | `image_definitions` | list | required |  | your environment config (`environment/`) | Gallery image definitions (name, publisher, offer, sku, os_type, hyper_v_generation, security_type, os_state); schema path images.image_definitions. |
 | `avd_budget_monthly` | int | required |  | your environment config (`environment/`) | Monthly budget amount (design 2.3). |
 | `enable_policy_assignments` | bool | optional | `True` | your environment config (`environment/`) | Assign the built-in Deny/Audit/Modify policies of design 2.4 at subscription scope. ADDED flag; not yet in the schema (DINE policies are a documented gap). |
-| `group_object_ids` | map | required |  | your environment config (`environment/`) | Object ids of the AVD groups (schema keys avd_azure, avd_azl, avd_hybrid, avd_users, avd_admins, avd_devices, lab_operators); this solution uses avd_users, avd_admins, lab_operators. |
+| `group_object_ids` | map | required |  | your environment config (`environment/`) | Object ids of the AVD groups (schema keys avd_azure, avd_azl, avd_hybrid, avd_users, avd_admins, avd_devices, platform_operators); this solution uses avd_users, avd_admins, platform_operators. |
 | `arc_onboard_sp_object_id` | string | optional | (empty) | your environment config (`environment/`) | Object id of the Arc onboarding service principal (New-AvdEntraGroups.ps1 -IncludeArcOnboardingPrincipal); empty skips its role assignment. ADDED; not yet in the schema. |
 
 
@@ -97,7 +97,7 @@ Bicep (`br/public:avm/...`):
 | `avm/res/network/private-dns-zone` | 0.8.1 | zone + links |
 | `avm/res/storage/storage-account` | 0.33.1 | account, shares, share RBAC, private endpoint (through its `privateEndpoints` interface), diagnostics |
 | `avm/res/recovery-services/vault` | 0.13.2 | vault + Azure Files policy (design said "AVM not confirmed"; it exists and is pinned) |
-| `avm/res/compute/gallery` | 0.9.5 | gallery + image definitions + Reader for lab operators |
+| `avm/res/compute/gallery` | 0.9.5 | gallery + image definitions + Reader for platform operators |
 | `avm/res/managed-identity/user-assigned-identity` | 0.6.0 | host-pool and AIB identities (design: "believed to exist; verify" — verified) |
 | `avm/res/insights/data-collection-rule` | 0.11.0 | AVD Insights DCR |
 | `avm/res/insights/scheduled-query-rule` | 0.6.0 | 3 alert rules |
@@ -163,7 +163,7 @@ Order with the other solutions: lz-azure-local (vault, workspace, action group, 
 
 `Remove-StrayAvdLzResources.ps1` follows the cross-vendor review of the sibling Azure Local script:
 
-1. **Discovery fails closed** (no `SilentlyContinue`; authorization and transport errors are classified and abort). Candidates = no lab token in the name and no `project=<token>` tag. Known types get a deletion order (Arc machines 100 ... workspaces 240); **every other type is an order-800 blocker** (`approved=false`, never deleted here). Locks (own and inherited) are recorded.
+1. **Discovery fails closed** (no `SilentlyContinue`; authorization and transport errors are classified and abort). Candidates = no naming token in the name and no `project=<token>` tag. Known types get a deletion order (Arc machines 100 ... workspaces 240); **every other type is an order-800 blocker** (`approved=false`, never deleted here). Locks (own and inherited) are recorded.
 2. The candidate file embeds `generatedOn`, `subscriptionId` and a SHA-256 of the item list. The owner sets `approved=true` per entry (`removeLock=true`, `acknowledgePermanent=true` where needed) and hands the same file back as `-ConfirmDeleteList`. **Only objects with `approved` + `id` are accepted; bare strings are an error.** A list for another subscription, with a broken integrity hash, older than 24 h or whose hash differs from the live discovery is refused (`-AllowStaleList` overrides the last two; per-item re-validation still applies).
 3. Before each delete the entry is **re-validated against the current candidate (same id and type)**; the context is pinned to the subscription on every Az call and tenant + subscription are verified first. Each delete is **polled to a terminal state** (`-DeleteTimeoutMinutes`, default 10). The run **stops at the first failure** unless `-ContinueOnError`.
 4. **Locks are never removed automatically.** Locked items are blocked unless `-RemoveLocks` and the entry's `removeLock=true`; inherited RG/subscription locks are never touched; removed locks are audited and restored when the delete fails.
@@ -183,7 +183,7 @@ Order with the other solutions: lz-azure-local (vault, workspace, action group, 
 
 ## Destroy
 
-`New-AvdLzTeardownPlan.ps1 -InputFile <generated tfvars>` prints and saves the ordered plan (backup items → hub-side peering → Azure Local-side peering → RGs hosts, arc, mon, img, stor, net, control → policy assignments, budget, custom roles). `-Execute` runs it (Bicep track: Az deletions; `-Tool Terraform`: `terraform plan -destroy` then apply). Session-host, control-plane and image solutions are torn down first; shared hub/VPN/DCs/Bastion and the Azure Local landing zone are never touched (the plan drops anything without the lab token).
+`New-AvdLzTeardownPlan.ps1 -InputFile <generated tfvars>` prints and saves the ordered plan (backup items → hub-side peering → Azure Local-side peering → RGs hosts, arc, mon, img, stor, net, control → policy assignments, budget, custom roles). `-Execute` runs it (Bicep track: Az deletions; `-Tool Terraform`: `terraform plan -destroy` then apply). Session-host, control-plane and image solutions are torn down first; shared hub/VPN/DCs/Bastion and the Azure Local landing zone are never touched (the plan drops anything without the naming token).
 
 ## Tests and gates
 

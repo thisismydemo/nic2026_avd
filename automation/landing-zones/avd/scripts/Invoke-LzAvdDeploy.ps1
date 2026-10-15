@@ -92,7 +92,7 @@ foreach ($current in $stages) {
         }
         'Preview' {
             $inputs = Get-LzAvdInputs -InputFile $tfVarsFile
-            $deploymentName = "dep-$($inputs.org)-$($inputs.lab_token)-$Solution-01"
+            $deploymentName = "dep-$($inputs.org)-$($inputs.naming_token)-$Solution-01"
             if ($Tool -eq 'Bicep') {
                 # what-if is read-only
                 Invoke-LzAvdNative -FilePath 'az' -ArgumentList @('deployment', 'sub', 'what-if', '--subscription', $inputs.subscription_id_avd, '--location', $inputs.location, '--name', $deploymentName, '--template-file', (Join-Path $bicepDir 'main.bicep'), '--parameters', $bicepParamFile)
@@ -106,7 +106,7 @@ foreach ($current in $stages) {
         'Deploy' {
             if (-not $Execute) { throw 'Deploy requires -Execute (owner approval). Without it only Preview runs.' }
             $inputs = Get-LzAvdInputs -InputFile $tfVarsFile
-            $deploymentName = "dep-$($inputs.org)-$($inputs.lab_token)-$Solution-01"
+            $deploymentName = "dep-$($inputs.org)-$($inputs.naming_token)-$Solution-01"
             $target = "subscription $($inputs.subscription_id_avd) ($Tool, $deploymentName)"
             if ($PSCmdlet.ShouldProcess($target, 'Deploy lz-avd')) {
                 if ($Tool -eq 'Bicep') {

@@ -2,7 +2,7 @@
 using './main.bicep'
 
 param org = 'iic'
-param lab_token = 'nic26'
+param naming_token = 'nic26'
 param location = 'eastus'
 param location_short = 'eus'
 param tenant_id = '00000000-0000-0000-0000-000000000000'
@@ -11,7 +11,7 @@ param subscription_id_azl = '00000000-0000-0000-0000-000000000000'
 
 param tags = {
   org: 'iic'
-  lab: 'nic26'
+  token: 'nic26'
 }
 
 param names = {

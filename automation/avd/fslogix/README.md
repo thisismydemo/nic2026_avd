@@ -14,7 +14,7 @@ One `fslogix-settings.json` serves the Azure VM, Azure Local VM and Hyper-V VM s
 
 ## Cloud Cache (pattern B, design/avd/landing-zone.md 7.10)
 
-`Set-FslogixHostConfig.ps1 -CloudCacheProviderUnc <nearest>,<far>` writes `CCDLocations` (SMB providers in that order) for the profile and ODFC containers, removes `VHDLocations` (Learn: never both), and applies the `cloud_cache` values from `fslogix-settings.json` (`HealthyProvidersRequiredForRegister` 1, unregister timeout, lock retries, `ClearCacheOnLogoff`). Every host that serves those users must be switched the same way, nearest provider first. `Test-FslogixHostConfig.ps1` takes the same parameter. Not applied in the lab until the prerequisites in D-053 are cleared.
+`Set-FslogixHostConfig.ps1 -CloudCacheProviderUnc <nearest>,<far>` writes `CCDLocations` (SMB providers in that order) for the profile and ODFC containers, removes `VHDLocations` (Learn: never both), and applies the `cloud_cache` values from `fslogix-settings.json` (`HealthyProvidersRequiredForRegister` 1, unregister timeout, lock retries, `ClearCacheOnLogoff`). Every host that serves those users must be switched the same way, nearest provider first. `Test-FslogixHostConfig.ps1` takes the same parameter. Not applied until the prerequisites in D-053 are cleared.
 
 ## Notes
 

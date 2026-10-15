@@ -9,7 +9,7 @@ param name string
 resource noPublicIp 'Microsoft.Authorization/policyAssignments@2025-01-01' = {
   name: name
   properties: {
-    displayName: 'AVD lab: no public IPs on session hosts'
+    displayName: 'AVD landing zone: no public IPs on session hosts'
     policyDefinitionId: tenantResourceId('Microsoft.Authorization/policyDefinitions', builtInPolicies.networkInterfacesNoPublicIps)
     enforcementMode: 'Default'
   }

@@ -2,7 +2,7 @@ variable "org" {
   type = string
 }
 
-variable "lab_token" {
+variable "naming_token" {
   type = string
 }
 

@@ -30,7 +30,7 @@ This repository accompanies a session that shows one AVD workspace with three ho
 | `automation/landing-zones/avd/` | Spoke network, private DNS resolver, FSLogix storage, monitoring configuration, Entra groups and SSO scripts |
 | `automation/avd/control-plane/` | Workspace, host pools, application groups and scaling plan |
 | `automation/avd/fslogix/` | Share permissions, host settings and `redirections.xml` |
-| `automation/avd/images/` | Azure Image Builder for Azure and Azure Local; Packer for Hyper-V (template passes `packer validate`; the lab hosts use the marketplace image); Packer for vSphere and Nutanix AHV (reference templates, not run) |
+| `automation/avd/images/` | Azure Image Builder for Azure and Azure Local; Packer for Hyper-V (template passes `packer validate`; the demo hosts use the marketplace image); Packer for vSphere and Nutanix AHV (reference templates, not run) |
 | `automation/avd/session-hosts-azure/`, `session-hosts-azure-local/`, `session-hosts-hybrid/` | Session hosts per deployment model; the hybrid one builds Hyper-V VMs and installs the Arc agent and CloudDeviceExtension |
 | `automation/demo/` | The helpers the follow-along guide uses: state, routing, portability, failure and smoke test |
 

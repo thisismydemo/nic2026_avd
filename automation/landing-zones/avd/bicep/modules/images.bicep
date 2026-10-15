@@ -8,7 +8,7 @@ param location string
 param tags object
 param names object
 param image_definitions array
-param lab_operators_object_id string
+param platform_operators_object_id string
 
 module gallery 'br/public:avm/res/compute/gallery:0.9.5' = {
   name: 'dep-gallery'
@@ -19,7 +19,7 @@ module gallery 'br/public:avm/res/compute/gallery:0.9.5' = {
     description: 'AVD images for the three realms (multi-session for Azure and Azure Local, single-session for Hybrid)'
     roleAssignments: [
       {
-        principalId: lab_operators_object_id
+        principalId: platform_operators_object_id
         principalType: 'Group'
         roleDefinitionIdOrName: 'Reader'
       }

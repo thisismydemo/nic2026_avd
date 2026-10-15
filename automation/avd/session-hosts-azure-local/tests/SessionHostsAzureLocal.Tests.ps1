@@ -112,10 +112,10 @@ Describe 'Manifest and infrastructure contracts' {
         foreach ($text in @($bicep, $hostFile, $tf, $tfVars)) {
         }
         foreach ($text in @($bicep, $hostFile)) {
-            $text | Should -Not -Match '(?i)param\s+\w*(registration|(?<!lab_)token)'
+            $text | Should -Not -Match '(?i)param\s+\w*(registration|(?<!naming_)token)'
             $text | Should -Not -Match '(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
         }
-        $tfVars | Should -Not -Match '(?i)variable\s+"?\w*(registration|(?<!lab_)token)'
+        $tfVars | Should -Not -Match '(?i)variable\s+"?\w*(registration|(?<!naming_)token)'
         $tf | Should -Not -Match '(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
     }
 }
@@ -199,7 +199,7 @@ Describe 'GPU demo workload (a4b option B)' {
         $script:gpuInstall = Get-Content (Join-Path $script:gpuDir 'Install-GpuDemoWorkload.ps1') -Raw
         $script:gpuInvoke = Get-Content (Join-Path $script:gpuDir 'Invoke-GpuDemoWorkload.ps1') -Raw
     }
-    It 'parses, holds no lab values and never touches the NVIDIA driver' {
+    It 'parses, holds no environment values and never touches the NVIDIA driver' {
         foreach ($f in 'Install-GpuDemoWorkload.ps1', 'Invoke-GpuDemoWorkload.ps1') {
             $errs = $null; $null = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $script:gpuDir $f), [ref]$null, [ref]$errs)
             $errs | Should -BeNullOrEmpty

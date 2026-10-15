@@ -9,7 +9,7 @@ depends_on: [lz-avd]
 
 inputs:
   - { name: org, type: string, description: "Organization identifier.", required: true, source: environment }
-  - { name: lab_token, type: string, description: "Lab token.", required: true, source: environment, path: token }
+  - { name: naming_token, type: string, description: "Naming token.", required: true, source: environment, path: token }
   - { name: fslogix_profile_unc, type: string, description: "Profile share UNC output of lz-avd.", required: true, source: environment }
   - { name: fslogix_odfc_unc, type: string, description: "ODFC share UNC output of lz-avd.", required: true, source: environment }
   - { name: fslogix_settings_file, type: string, description: "Path to the shared FSLogix settings JSON.", required: false, default: "fslogix-settings.json", source: environment }

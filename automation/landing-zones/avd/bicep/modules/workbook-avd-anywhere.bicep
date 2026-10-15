@@ -1,7 +1,7 @@
-// "AVD Anywhere · three terminals": one Azure Monitor workbook over the lab Log Analytics workspace that shows the three
+// "AVD Anywhere · three terminals": one Azure Monitor workbook over the Log Analytics workspace that shows the three
 // host pools side by side (owner, 14 Oct). Resource-group scope (the AVD control-plane resource group).
 // The workbook content is workbooks/avd-anywhere.workbook.json; two tokens are filled here so the JSON carries nothing
-// lab-specific: __WORKSPACE_ID__ (the workspace every query runs against) and __TERMINALS__ (a KQL datatable that maps
+// environment-specific: __WORKSPACE_ID__ (the workspace every query runs against) and __TERMINALS__ (a KQL datatable that maps
 // host pool name and computer-name prefix to the terminal label). Deployed by scripts/Deploy-AvdWorkbook.ps1.
 targetScope = 'resourceGroup'
 

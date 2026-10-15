@@ -6,7 +6,7 @@
 .DESCRIPTION
     Phase 0 - discovery (every run, read-only, fails closed): enumerates every resource and resource group in
     -SubscriptionId with the context pinned to that subscription. Candidates = anything whose name does not contain
-    -LabToken and whose tags do not carry project=<LabToken>. Candidates whose type is in the ordered deletion type
+    -NamingToken and whose tags do not carry project=<NamingToken>. Candidates whose type is in the ordered deletion type
     list get an order (100..299); every other type is listed as an order-800 BLOCKER (approved=false, never deleted by
     this script). Locks (own and inherited) are recorded per item. The candidate file (-CandidateFile) embeds the
     generation timestamp, the subscription and a SHA-256 of the item list; the owner reviews it, sets approved=true
@@ -27,9 +27,9 @@
     run: operator identity, tenant, subscription, mode, reviewed-list hash, every action with timestamp/status/error,
     lock changes, skipped and blocked items and the final state. Never touches another subscription.
 .EXAMPLE
-    .\Remove-StrayAvdLzResources.ps1 -SubscriptionId <id> -LabToken <lab> -CandidateFile .\stray-candidates.json
+    .\Remove-StrayAvdLzResources.ps1 -SubscriptionId <id> -NamingToken <token> -CandidateFile .\stray-candidates.json
 .EXAMPLE
-    .\Remove-StrayAvdLzResources.ps1 -SubscriptionId <id> -TenantId <tid> -LabToken <lab> -Execute -ConfirmDeleteList .\stray-approved.json
+    .\Remove-StrayAvdLzResources.ps1 -SubscriptionId <id> -TenantId <tid> -NamingToken <token> -Execute -ConfirmDeleteList .\stray-approved.json
 .EXAMPLE
     .\Remove-StrayAvdLzResources.ps1 -SubscriptionId <id> -TenantId <tid> -Execute -ConfirmDeleteList .\stray-approved.json -DeleteEmptyResourceGroups
 #>
@@ -38,7 +38,7 @@
 param(
     [Parameter(Mandatory)][ValidatePattern('^[0-9a-fA-F-]{36}$')][string]$SubscriptionId,
     [ValidatePattern('^[0-9a-fA-F-]{36}$')][string]$TenantId,
-    [Parameter(Mandatory)][ValidatePattern('^[a-z0-9][a-z0-9-]{2,23}$')][string]$LabToken,
+    [Parameter(Mandatory)][ValidatePattern('^[a-z0-9][a-z0-9-]{2,23}$')][string]$NamingToken,
     [string]$CandidateFile = (Join-Path (Get-Location).Path 'lz-avd-stray-candidates.json'),
     [string]$ConfirmDeleteList,
     [string]$AuditFile,
@@ -142,10 +142,10 @@ $az = @{ DefaultProfile = $ctx }
 # ---------------------------------------------------------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------------------------------------------------------
-function Test-LzAvdIsLabResource {
+function Test-LzAvdIsEnvironmentResource {
     param([Parameter(Mandatory)][string]$Name, $Tags)
-    if ($Name -match [regex]::Escape($LabToken)) { return $true }
-    if ($Tags -and $Tags.ContainsKey('project') -and $Tags['project'] -eq $LabToken) { return $true }
+    if ($Name -match [regex]::Escape($NamingToken)) { return $true }
+    if ($Tags -and $Tags.ContainsKey('project') -and $Tags['project'] -eq $NamingToken) { return $true }
     return $false
 }
 
@@ -173,7 +173,7 @@ function Invoke-LzAvdDiscovery {
     if ($resources.Count -eq 0 -and $groups.Count -eq 0) { Write-LzAvdLog -Message "Subscription $SubscriptionId holds no resources and no resource groups (confirmed empty, not an error)." }
 
     $items = foreach ($r in $resources) {
-        if (Test-LzAvdIsLabResource -Name $r.Name -Tags $r.Tags) { continue }
+        if (Test-LzAvdIsEnvironmentResource -Name $r.Name -Tags $r.Tags) { continue }
         $typeKey = $r.ResourceType.ToLowerInvariant()
         $order = if ($deletionOrder.Contains($typeKey)) { $deletionOrder[$typeKey] } else { $blockerOrder }
         $ownLocks = @($locks | Where-Object { $_.ResourceId -and $_.ResourceId.ToLowerInvariant().StartsWith($r.ResourceId.ToLowerInvariant() + '/providers/microsoft.authorization/locks/') })
@@ -196,7 +196,7 @@ function Invoke-LzAvdDiscovery {
         }
     }
     $rgItems = foreach ($g in $groups) {
-        if (Test-LzAvdIsLabResource -Name $g.ResourceGroupName -Tags $g.Tags) { continue }
+        if (Test-LzAvdIsEnvironmentResource -Name $g.ResourceGroupName -Tags $g.Tags) { continue }
         $ownLocks = @($locks | Where-Object { $_.ResourceId -and $_.ResourceId.ToLowerInvariant().StartsWith($g.ResourceId.ToLowerInvariant() + '/providers/microsoft.authorization/locks/') })
         [pscustomobject]@{
             kind     = 'resourceGroup'
@@ -279,7 +279,7 @@ function Test-LzAvdStillEligible {
     $now = Get-AzResource @az -ResourceId $Id -ErrorAction Stop
     if (-not $now) { return 'the resource no longer exists' }
     if ($now.ResourceType -ine $Type) { return "its type is now '$($now.ResourceType)'" }
-    if (Test-LzAvdIsLabResource -Name $now.Name -Tags $now.Tags) { return "it now contains '$LabToken' or is tagged project=$LabToken" }
+    if (Test-LzAvdIsEnvironmentResource -Name $now.Name -Tags $now.Tags) { return "it now contains '$NamingToken' or is tagged project=$NamingToken" }
     $locksNow = @(Get-AzResourceLock @az)
     $own = @($locksNow | Where-Object { $_.ResourceId -and $_.ResourceId.ToLowerInvariant().StartsWith($Id.ToLowerInvariant() + '/providers/microsoft.authorization/locks/') } | ForEach-Object { $_.ResourceId.ToLowerInvariant() } | Sort-Object)
     $rgId = "/subscriptions/$SubscriptionId/resourceGroups/$($now.ResourceGroupName)".ToLowerInvariant()
@@ -314,7 +314,7 @@ try {
         generatedBy    = $audit.operator
         tenantId       = $audit.tenantId
         subscriptionId = $SubscriptionId
-        labToken       = $LabToken
+        namingToken       = $NamingToken
         itemsHash      = $hash
         approvedBy     = ''
         approvedOn     = ''
@@ -378,7 +378,7 @@ if ($DeleteEmptyResourceGroups) {
         try {
             if (-not (Test-LzAvdResourceInSubscription -ResourceId $id -SubscriptionId $SubscriptionId)) { $refused.Add([pscustomobject]@{ Id = $id; Reason = 'outside the target subscription' }); Add-LzAvdAction -Phase 'rg' -Id $id -Type 'resourceGroup' -Action 'validate' -Status 'refused' -ErrorMessage 'outside the target subscription'; continue }
             $live = Get-LzAvdCurrentCandidate -Entry $entry -Current $current
-            if (-not $live) { $refused.Add([pscustomobject]@{ Id = $id; Reason = 'not a live stray resource group (missing, renamed or lab-tagged)' }); Add-LzAvdAction -Phase 'rg' -Id $id -Type 'resourceGroup' -Action 'validate' -Status 'refused' -ErrorMessage 'not a live candidate'; continue }
+            if (-not $live) { $refused.Add([pscustomobject]@{ Id = $id; Reason = 'not a live stray resource group (missing, renamed or token-tagged)' }); Add-LzAvdAction -Phase 'rg' -Id $id -Type 'resourceGroup' -Action 'validate' -Status 'refused' -ErrorMessage 'not a live candidate'; continue }
             if (@($live.ownLocks).Count -gt 0) { $audit.blocked.Add([pscustomobject]@{ id = $id; type = $live.type; reason = 'locked resource group (locks are never removed in the resource-group phase)' }); Add-LzAvdAction -Phase 'rg' -Id $id -Type 'resourceGroup' -Action 'validate' -Status 'blocked' -ErrorMessage 'locked'; continue }
             # full re-enumeration of the group, any type; errors are fatal for the run
             $remaining = @(Get-AzResource @az -ResourceGroupName $live.name)
@@ -416,7 +416,7 @@ foreach ($entry in $approvedItems) {
         if (-not (Test-LzAvdResourceInSubscription -ResourceId $id -SubscriptionId $SubscriptionId)) { $refused.Add([pscustomobject]@{ Id = $id; Reason = 'outside the target subscription' }); Add-LzAvdAction -Phase 'resources' -Id $id -Type $type -Action 'validate' -Status 'refused' -ErrorMessage 'outside the target subscription'; continue }
         # re-validate against the CURRENT candidate immediately before acting (same id and type)
         $live = Get-LzAvdCurrentCandidate -Entry $entry -Current $current
-        if (-not $live) { $refused.Add([pscustomobject]@{ Id = $id; Reason = "not a live stray candidate with type '$type' (contains '$LabToken', tagged project=$LabToken, type changed, or gone)" }); Add-LzAvdAction -Phase 'resources' -Id $id -Type $type -Action 'validate' -Status 'refused' -ErrorMessage 'not a live candidate'; continue }
+        if (-not $live) { $refused.Add([pscustomobject]@{ Id = $id; Reason = "not a live stray candidate with type '$type' (contains '$NamingToken', tagged project=$NamingToken, type changed, or gone)" }); Add-LzAvdAction -Phase 'resources' -Id $id -Type $type -Action 'validate' -Status 'refused' -ErrorMessage 'not a live candidate'; continue }
         if ($live.blocker) { $refused.Add([pscustomobject]@{ Id = $id; Reason = 'blocker: type is not in the deletion type list (order 800)' }); Add-LzAvdAction -Phase 'resources' -Id $id -Type $type -Action 'validate' -Status 'refused' -ErrorMessage 'blocker type'; continue }
         if (@($live.inheritedLocks).Count -gt 0) { $audit.blocked.Add([pscustomobject]@{ id = $id; type = $type; reason = "inherited lock(s) at resource-group/subscription scope are never removed: $($live.inheritedLocks -join ', ')" }); Add-LzAvdAction -Phase 'resources' -Id $id -Type $type -Action 'validate' -Status 'blocked' -ErrorMessage 'inherited lock'; continue }
         $wantsLockRemoval = $RemoveLocks -and $entry.ContainsKey('removeLock') -and $entry['removeLock'] -eq $true

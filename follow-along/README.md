@@ -1,6 +1,6 @@
 # Follow-along guide — AVD Anywhere
 
-_Generated from the demo-guide content by `npm run docs`. Full follow-along: every demo has an attendee version. Azure and the portability pattern need no special hardware; Azure Local and Hybrid steps are hypervisor-agnostic with lab values as variables._
+_Generated from the demo-guide content by `npm run docs`. Full follow-along: every demo has an attendee version. Azure and the portability pattern need no special hardware; Azure Local and Hybrid steps are hypervisor-agnostic with your values as variables._
 
 Session: Azure Virtual Desktop on Azure, Azure Local, and AVD Hybrid Platforms. Wed 14 Oct 2026, 13:20 (W. Europe Time).
 
@@ -347,7 +347,7 @@ Replace the placeholders in the commands with your own values:
 
 - A standard host pool created without VMs and with a managed identity
 - Reader for that identity on the Arc resource group
-- An Arc-enabled Windows 11 Enterprise VM joined to AD DS, Entra ID or both (hybrid); this lab joins AD DS
+- An Arc-enabled Windows 11 Enterprise VM joined to AD DS, Entra ID or both (hybrid); this demo joins AD DS
 - Az.DesktopVirtualization and Az.ConnectedMachine
 
 **Steps**
@@ -553,7 +553,7 @@ Replace the placeholders in the commands with your own values:
 
 - Nothing to clean up (read-only).
 
-**In the repo:** `automation/shared/security`, `design/shared/security-operations.md`
+**In the repo:** `automation/shared/security`
 
 ### Connecting flight 1: three host pools, one workspace
 
@@ -863,7 +863,7 @@ Replace the placeholders in the commands with your own values:
 
 **Goal:** Understand GPU by DDA versus GPU partitioning on Azure Local, what the free driver gives (compute and AI) and what desktop graphics acceleration needs (NVIDIA vWS licensing).
 
-**In the repo:** `automation/azure-local/cluster-configure/gpu`
+**In the repo:** `automation/avd/session-hosts-azure-local`
 
 ## Watch only
 

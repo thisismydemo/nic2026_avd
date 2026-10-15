@@ -2,7 +2,7 @@
 
 Thirteen rows, three deployment models. The session slide shows five of these rows (locality, lifecycle owner, identity and OS, operations, support and licensing); this handout has all thirteen.
 
-**Status:** prepared 2026-10-06; cloud-only Azure Files guidance reviewed 2026-10-09 from Microsoft Learn (2609 release family for Azure Local) and the session lab; every cell was checked against the Learn pages listed under Sources. Support statements change by release, so re-check the linked documentation before you design from this table.
+**Status:** prepared 2026-10-06; cloud-only Azure Files guidance reviewed 2026-10-09 from Microsoft Learn (2609 release family for Azure Local) and the session demo environment; every cell was checked against the Learn pages listed under Sources. Support statements change by release, so re-check the linked documentation before you design from this table.
 
 | # | Axis | AVD on Azure | AVD on Azure Local | AVD Hybrid |
 |---|---|---|---|---|

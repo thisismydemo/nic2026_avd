@@ -4,7 +4,7 @@
     Routes a demo user to another realm (outline §8 steps 2-3): moves the user between the realm groups that are
     assigned to each realm's desktop application group. -WhatIf is the default; fully reversible.
 .DESCRIPTION
-    Group mode (default, how the lab assigns app groups): the user is added to grp-...-avd-<target> and removed from
+    Group mode (default, how this demo assigns app groups): the user is added to grp-...-avd-<target> and removed from
     the other realm groups (Microsoft Graph). Direct mode: the 'Desktop Virtualization User' role is assigned on the
     target realm's application group and removed from the other two (Az RBAC). Idempotent: a user already routed to
     the target and nowhere else is reported as "no change". The UNDO command (same script with the previous realm,

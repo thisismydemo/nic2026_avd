@@ -85,9 +85,9 @@ Describe 'names catalog (contract section 10, naming standard)' {
         }
     }
 
-    It 'IaC never builds a resource name from org/lab_token/location_short' {
-        $script:bicepAll | Should -Not -Match "'\$\{org\}-|\$\{lab_token\}|\$\{location_short\}"
-        $script:tfAll | Should -Not -Match '\$\{var\.org\}-|\$\{var\.lab_token\}|\$\{var\.location_short\}'
+    It 'IaC never builds a resource name from org/naming_token/location_short' {
+        $script:bicepAll | Should -Not -Match "'\$\{org\}-|\$\{naming_token\}|\$\{location_short\}"
+        $script:tfAll | Should -Not -Match '\$\{var\.org\}-|\$\{var\.naming_token\}|\$\{var\.location_short\}'
     }
 
     It 'rendered names (example tfvars = the expected catalog output) follow the naming standard' {
@@ -100,7 +100,7 @@ Describe 'names catalog (contract section 10, naming standard)' {
                 $expected | Should -Be $entry.name
                 continue
             }
-            $expected | Should -Match 'nic26' -Because "$key must carry the lab token (D-005)"
+            $expected | Should -Match 'nic26' -Because "$key must carry the naming token (D-005)"
             $expected | Should -Match 'iic' -Because "$key must carry the org token (D-006)"
             switch ($entry.type) {
                 'st' { $expected | Should -Match '^[a-z0-9]{3,24}$' }

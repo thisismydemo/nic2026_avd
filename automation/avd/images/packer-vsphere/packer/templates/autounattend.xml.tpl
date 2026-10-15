@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Build-only answer file (reference template, not run in the lab). The local build account uses PlainText because unattended
+<!-- Build-only answer file (reference template, not run end to end). The local build account uses PlainText because unattended
      Setup needs the supplied password; the account exists only in the build VM and sysprep /generalize removes it before the
      image is distributed. The file is rendered into a CD that Packer attaches to the build VM: isolate the build network,
      do not retain or publish that media. No identity and no product key literal: ${product_key} may be empty. -->

@@ -12,8 +12,8 @@ type ImageTemplateSpec = {
 @description('Naming component retained for manifest parity.')
 param org string
 
-@description('Lab naming component retained for manifest parity.')
-param lab_token string
+@description('Naming component retained for manifest parity.')
+param naming_token string
 
 param location string
 

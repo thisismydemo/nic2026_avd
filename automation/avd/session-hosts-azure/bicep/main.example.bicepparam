@@ -1,7 +1,7 @@
 using './main.bicep'
 
 param org = 'iic'
-param lab_token = 'nic26'
+param naming_token = 'nic26'
 param location = 'eastus'
 param location_short = 'eus'
 param tenant_id = '00000000-0000-0000-0000-000000000000'

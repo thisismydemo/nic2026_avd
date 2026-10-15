@@ -3,7 +3,7 @@
 using './main.bicep'
 
 param org = 'iic'
-param lab_token = 'nic26'
+param naming_token = 'nic26'
 param location = 'eastus'
 param location_short = 'eus'
 param tenant_id = '00000000-0000-0000-0000-000000000000'
@@ -17,7 +17,7 @@ param tags = {
   environment: 'demo'
   owner: 'owner@contoso.com'
   'managed-by': 'bicep'
-  'cost-center': 'iic-lab'
+  'cost-center': 'iic-nic26-demo'
   lifecycle: 'temporary'
 }
 param names = {
@@ -134,6 +134,6 @@ param deploy_platform_scope_items = false
 param group_object_ids = {
   avd_users: '00000000-0000-0000-0000-000000000000'
   avd_admins: '00000000-0000-0000-0000-000000000000'
-  lab_operators: '00000000-0000-0000-0000-000000000000'
+  platform_operators: '00000000-0000-0000-0000-000000000000'
 }
 param arc_onboard_sp_object_id = ''

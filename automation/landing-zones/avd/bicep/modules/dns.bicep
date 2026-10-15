@@ -1,5 +1,5 @@
-// lz-avd private DNS — design/avd/landing-zone.md §4.5 and decision P-11 (the lab owns privatelink.file.core.windows.net)
-// Zone links carry the lab token (link_*); the zone name is Azure-fixed and exempt. AVM private-dns-zone 0.8.1.
+// lz-avd private DNS — design/avd/landing-zone.md §4.5 and decision P-11 (the platform owns privatelink.file.core.windows.net)
+// Zone links carry the naming token (link_*); the zone name is Azure-fixed and exempt. AVM private-dns-zone 0.8.1.
 targetScope = 'resourceGroup'
 
 param tags object

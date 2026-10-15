@@ -12,7 +12,7 @@ depends_on: [lz-avd]
 inputs:
   # --- naming and placement (shared environment file; design §11.5) ---
   - { name: org,                  type: string, description: "Organization token in every name (D-006).", required: true, source: environment }
-  - { name: lab_token,            type: string, description: "Lab/conference token in every name (D-005); shared schema key `token`.", required: true, source: environment, path: token }
+  - { name: naming_token,            type: string, description: "Naming token in every name (D-005); shared schema key `token`.", required: true, source: environment, path: token }
   - { name: location,             type: string, description: "Azure region for every regional resource (D-010); AVD metadata location.", required: true, source: environment }
   - { name: location_short,       type: string, description: "Short region token used in names.", required: true, source: environment }
   - { name: tenant_id,            type: string, description: "Entra tenant id (D-002).", required: true, source: environment }
@@ -31,7 +31,7 @@ inputs:
   # --- identity and monitoring (design §5.3, §9.2) ---
   - { name: group_object_ids,     type: map,    description: "Object ids of the AVD groups (schema keys avd_azure, avd_azl, avd_hybrid, ...); the three realm groups get Desktop Virtualization User on their application group.", required: true, source: environment }
   - { name: avd_service_principal_object_id, type: string, description: "Object id of the Azure Virtual Desktop first-party service principal in this tenant (Get-AzADServicePrincipal -DisplayName 'Azure Virtual Desktop'); grants Desktop Virtualization Power On Off Contributor at subscription scope for the scaling plan and Start VM on Connect. Empty skips the assignment (design §5.3 says verify it is not already assigned higher up).", required: false, default: "", source: environment }
-  - { name: log_analytics_workspace_id, type: string, description: "Lab workspace law-* (lz-azure-local output) for the AVD diagnostic settings (AVD-LZ-12); empty skips diagnostics.", required: true, source: environment }
+  - { name: log_analytics_workspace_id, type: string, description: "Log Analytics workspace law-* (lz-azure-local output) for the AVD diagnostic settings (AVD-LZ-12); empty skips diagnostics.", required: true, source: environment }
 
 outputs:
   - { name: workspace_id,         type: string, description: "AVD workspace resource id." }

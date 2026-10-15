@@ -3,8 +3,8 @@ variable "org" {
   type        = string
 }
 
-variable "lab_token" {
-  description = "Lab token; manifest parity only (not a registration token)."
+variable "naming_token" {
+  description = "Naming token; manifest parity only (not a registration token)."
   type        = string
 }
 

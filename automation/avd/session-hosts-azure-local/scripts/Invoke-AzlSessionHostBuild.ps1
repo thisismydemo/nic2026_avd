@@ -195,7 +195,7 @@ foreach ($key in @($cfg['tags'].Keys)) { $tags[$key] = [string]$cfg['tags'][$key
 
 $parameters = [ordered]@{
     org                 = @{ value = 'iic' }
-    lab_token           = @{ value = 'nic26' }
+    naming_token           = @{ value = 'nic26' }
     location            = @{ value = $customLocation.Location }
     location_short      = @{ value = 'n/a' }
     tenant_id           = @{ value = (Get-AzContext).Tenant.Id }

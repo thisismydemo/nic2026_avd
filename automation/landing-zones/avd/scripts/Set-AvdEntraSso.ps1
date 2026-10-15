@@ -15,7 +15,7 @@ consent prompt. Names must be unique in the tenant. A dynamic device group conta
 .PARAMETER Execute
 Permits changes. Without this switch, the script runs in WhatIf mode.
 .EXAMPLE
-./Set-AvdEntraSso.ps1 -TenantId '00000000-0000-0000-0000-000000000000' -TargetDeviceGroupName 'grp-<org>-<lab>-avd-devices' -Execute
+./Set-AvdEntraSso.ps1 -TenantId '00000000-0000-0000-0000-000000000000' -TargetDeviceGroupName 'grp-<org>-<token>-avd-devices' -Execute
 #>
 [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
 param(

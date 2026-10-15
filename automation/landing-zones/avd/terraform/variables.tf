@@ -6,9 +6,9 @@ variable "org" {
   description = "Organization token in every name (D-006)."
 }
 
-variable "lab_token" {
+variable "naming_token" {
   type        = string
-  description = "Lab token in every name (D-005)."
+  description = "Naming token in every name (D-005)."
 }
 
 variable "location" {
@@ -106,7 +106,7 @@ variable "azl_spoke_prefix" {
 
 variable "log_analytics_workspace_id" {
   type        = string
-  description = "Lab Log Analytics workspace id (lz-azure-local output)."
+  description = "Log Analytics workspace id (lz-azure-local output)."
 }
 
 variable "key_vault_id" {
@@ -153,7 +153,7 @@ variable "dns_resolver_inbound_ip" {
 
 variable "privatelink_file_zone_id" {
   type        = string
-  description = "Existing privatelink.file zone id to reuse; empty creates the lab zone (P-11)."
+  description = "Existing privatelink.file zone id to reuse; empty creates its own zone (P-11)."
   default     = ""
 }
 
@@ -225,11 +225,11 @@ variable "enable_policy_assignments" {
 
 variable "group_object_ids" {
   type = object({
-    avd_users     = string
-    avd_admins    = string
-    lab_operators = string
+    avd_users          = string
+    avd_admins         = string
+    platform_operators = string
   })
-  description = "Object ids keyed avd_users, avd_admins, lab_operators."
+  description = "Object ids keyed avd_users, avd_admins, platform_operators."
 }
 
 variable "arc_onboard_sp_object_id" {

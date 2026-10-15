@@ -10,7 +10,7 @@ Authored by gpt-6-sol via the HCS Foundry gateway; review is recorded in `design
 ## Order
 
 1. Deploy `lz-avd`.
-2. `scripts/Get-PlatformImageVersion.ps1` for the region, publisher, offer and SKU: the lab pins an **exact** source version so every build is reproducible (AIB would accept `latest`, resolved at build time; the script refuses it by design).
+2. `scripts/Get-PlatformImageVersion.ps1` for the region, publisher, offer and SKU: this solution pins an **exact** source version so every build is reproducible (AIB would accept `latest`, resolved at build time; the script refuses it by design).
 3. Deploy the IaC (Bicep or Terraform) with that version and the two generated template specs. Keep `install_teams_app = 'false'` for the Microsoft 365 marketplace source (it already ships Teams).
 4. `scripts/Start-ImageBuild.ps1` without `-Execute` to see the plan, then with `-Execute`. A build takes 45-90 minutes: record it, never run it live. The result is the recorded last-run status; record the resulting gallery image version ids for `avd-images-azure-local` and the session-host solutions.
 

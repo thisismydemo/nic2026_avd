@@ -13,7 +13,7 @@ depends_on: [lz-avd, avd-control-plane, avd-images-packer-hyperv]
 inputs:
   # --- naming and placement (shared environment file) ----------------------------------------------------------------
   - { name: org,                        type: string, description: "Organization token in every name (D-006).", required: true, source: environment }
-  - { name: lab_token,                  type: string, description: "Lab/conference token in every name (D-005); shared schema key `token`.", required: true, source: environment, path: token }
+  - { name: naming_token,                  type: string, description: "Naming token in every name (D-005); shared schema key `token`.", required: true, source: environment, path: token }
   - { name: location,                   type: string, description: "Azure region of the Arc machines and extensions (design §16.1 arc_location = location, D-010).", required: true, source: environment }
   - { name: location_short,             type: string, description: "Short region token used in names.", required: true, source: environment }
   - { name: tenant_id,                  type: string, description: "Entra tenant id (D-002); azcmagent connect --tenant-id.", required: true, source: environment }
@@ -51,14 +51,14 @@ inputs:
   - { name: manage_arc_rg_rbac,         type: bool,   description: "Own the Arc-RG role assignments here (host-pool Reader, user sign-in roles, onboarding role). Default false because lz-avd assigns them; set true only when lz-avd's assignments are removed. ADDED flag.", required: false, default: false, source: environment }
   - { name: assign_vm_login_roles,      type: bool,   description: "Assign Virtual Machine User/Administrator Login on the Arc RG (AVD-LZ-08 first-day test: sign-in authorization on Microsoft.HybridCompute machines is undocumented for AVD Hybrid). ADDED flag.", required: false, default: true, source: environment }
   - { name: group_object_ids,           type: map,    description: "Object ids of the AVD groups (schema keys avd_users, avd_admins, ...).", required: true, source: environment }
-  - { name: arc_onboard_sp_object_id,   type: string, description: "Object id of spn-<org>-<lab>-arc-onboard; empty skips the Azure Connected Machine Onboarding assignment.", required: true, source: environment }
+  - { name: arc_onboard_sp_object_id,   type: string, description: "Object id of spn-<org>-<token>-arc-onboard; empty skips the Azure Connected Machine Onboarding assignment.", required: true, source: environment }
 
   # --- secrets (keyvault:// references, names only; resolved in memory on the Windows jump server) ---------------------
   - { name: secret_name_prefix,         type: string, description: "Key Vault secret-name prefix (contract §12); real name = <secret_name_prefix><logical name>.", required: true, source: environment }
   - { name: hybrid_local_admin_username, type: secret-ref, description: "Local administrator user name for the VMs (unattend, PowerShell Direct).", required: true, source: keyvault, path: secret_refs.hybrid_local_admin_username }
   - { name: hybrid_local_admin_password, type: secret-ref, description: "Local administrator password for the VMs.", required: true, source: keyvault, path: secret_refs.hybrid_local_admin_password }
-  - { name: arc_onboarding_client_id,   type: secret-ref, description: "Client id of spn-<org>-<lab>-arc-onboard (HYB-06).", required: true, source: keyvault, path: secret_refs.arc_onboarding_client_id }
-  - { name: arc_onboarding_secret,      type: secret-ref, description: "Client secret of spn-<org>-<lab>-arc-onboard (HYB-06).", required: true, source: keyvault, path: secret_refs.arc_onboarding_secret }
+  - { name: arc_onboarding_client_id,   type: secret-ref, description: "Client id of spn-<org>-<token>-arc-onboard (HYB-06).", required: true, source: keyvault, path: secret_refs.arc_onboarding_client_id }
+  - { name: arc_onboarding_secret,      type: secret-ref, description: "Client secret of spn-<org>-<token>-arc-onboard (HYB-06).", required: true, source: keyvault, path: secret_refs.arc_onboarding_secret }
   - { name: entra_bulk_token,           type: secret-ref, description: "Base64 provisioning package carrying the Entra bulk-enrollment token (HYB-05; 30-day lifetime).", required: true, source: keyvault, path: secret_refs.entra_bulk_token }
 
 outputs:
@@ -66,7 +66,7 @@ outputs:
   - { name: arc_rg_id,              type: string, description: "Arc machines resource group id (scope of the Reader / sign-in / onboarding assignments)." }
   - { name: hostpool_hybrid_name,   type: string, description: "Hybrid host pool name the hosts register to." }
   - { name: hostpool_rg,            type: string, description: "Control-plane resource group holding the host pool." }
-  - { name: expected_host_names,    type: list,   description: "Computer / Arc / session-host names from the name catalog (<lab>-avd-hv01, <lab>-avd-hv02); Test-HybridHost.ps1 compares them with hybrid_vms." }
+  - { name: expected_host_names,    type: list,   description: "Computer / Arc / session-host names from the name catalog (<token>-avd-hv01, <token>-avd-hv02); Test-HybridHost.ps1 compares them with hybrid_vms." }
   - { name: arc_machine_ids,        type: list,   description: "Arc machine resource ids (empty until enable_arc_extensions is true)." }
   - { name: ama_extension_ids,      type: list,   description: "AzureMonitorWindowsAgent extension ids (empty until enable_arc_extensions is true)." }
   - { name: dcr_association_ids,    type: list,   description: "DCR association ids (empty until enable_arc_extensions is true)." }

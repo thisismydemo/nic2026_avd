@@ -1,4 +1,4 @@
-// AVD control-plane diagnostic settings to the lab workspace (design/avd/landing-zone.md §9.3, AVD-LZ-12, D-054).
+// AVD control-plane diagnostic settings to the Log Analytics workspace (design/avd/landing-zone.md §9.3, AVD-LZ-12, D-054).
 // Resource-group scope (the control-plane resource group). Same setting names and content as avd/control-plane/bicep
 // (name = guid(resource id, workspace id), allLogs category group), so a later control-plane run finds them unchanged.
 // Exists so the monitoring can be moved to another workspace without re-deploying the host pools (their live settings

@@ -16,7 +16,7 @@ var governedTags = ['project', 'workload', 'environment', 'owner', 'lifecycle']
 resource allowedLocations 'Microsoft.Authorization/policyAssignments@2025-01-01' = {
   name: names.asg_allowed_locations
   properties: {
-    displayName: 'AVD lab: allowed locations'
+    displayName: 'AVD landing zone: allowed locations'
     policyDefinitionId: tenantResourceId('Microsoft.Authorization/policyDefinitions', builtInPolicies.allowedLocations)
     enforcementMode: 'Default'
     parameters: {
@@ -31,7 +31,7 @@ resource requireTags 'Microsoft.Authorization/policyAssignments@2025-01-01' = [
   for tagName in governedTags: {
     name: '${names.asg_require_tags}-${tagName}'
     properties: {
-      displayName: 'AVD lab: require tag ${tagName} on resource groups'
+      displayName: 'AVD landing zone: require tag ${tagName} on resource groups'
       policyDefinitionId: tenantResourceId('Microsoft.Authorization/policyDefinitions', builtInPolicies.requireTagOnResourceGroups)
       enforcementMode: 'Default'
       parameters: {
@@ -51,7 +51,7 @@ resource inheritTags 'Microsoft.Authorization/policyAssignments@2025-01-01' = [
       type: 'SystemAssigned'
     }
     properties: {
-      displayName: 'AVD lab: inherit tag ${tagName} from the resource group'
+      displayName: 'AVD landing zone: inherit tag ${tagName} from the resource group'
       policyDefinitionId: tenantResourceId('Microsoft.Authorization/policyDefinitions', builtInPolicies.inheritTagFromResourceGroupIfMissing)
       enforcementMode: 'Default'
       parameters: {
@@ -84,7 +84,7 @@ resource storageHygiene 'Microsoft.Authorization/policyAssignments@2025-01-01' =
   for (definitionId, i) in storagePolicies: {
     name: '${names.asg_storage_hygiene}-${i + 1}'
     properties: {
-      displayName: 'AVD lab: storage hygiene (${i + 1})'
+      displayName: 'AVD landing zone: storage hygiene (${i + 1})'
       policyDefinitionId: tenantResourceId('Microsoft.Authorization/policyDefinitions', definitionId)
       enforcementMode: 'Default'
       parameters: {

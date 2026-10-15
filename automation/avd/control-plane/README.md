@@ -21,7 +21,7 @@ AVD workspace, three host pools (Azure, Azure Local, Hybrid), one Desktop applic
 
 ## Behaviour to expect (incremental deployment is additive)
 
-- Setting `enable_scaling_plan` to false does **not** remove or disable an already-deployed scaling plan; use `destroy` or delete it. Removing a group id from `group_object_ids` does not revoke the old group's role assignment either. This is by design for a short-lived lab; treat changes to these inputs as destroy/recreate.
+- Setting `enable_scaling_plan` to false does **not** remove or disable an already-deployed scaling plan; use `destroy` or delete it. Removing a group id from `group_object_ids` does not revoke the old group's role assignment either. This is by design for a short-lived deployment; treat changes to these inputs as destroy/recreate.
 - Role assignments are named deterministically from scope, principal and role. If someone created an equivalent assignment by hand under a different name, the deployment fails with `RoleAssignmentExists`; remove the manual one.
 
 ## Run

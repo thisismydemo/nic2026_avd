@@ -1,6 +1,6 @@
 # Packer: Windows 11 Enterprise single-session on Nutanix AHV
 
-**Reference template, not run in the lab.** `packer init`, `fmt -check` and `validate` pass (Packer 1.16.1, Nutanix plugin 1.3.0); no build has been run against a Prism endpoint. The first build in your own environment is the real test.
+**Reference template, not run end to end.** `packer init`, `fmt -check` and `validate` pass (Packer 1.16.1, Nutanix plugin 1.3.0); no build has been run against a Prism endpoint. The first build in your own environment is the real test.
 
 It builds a UEFI Secure Boot, vTPM Windows 11 Enterprise single-session image for AVD Hybrid session hosts, with the same shared customizers, order and manifest output as the [Hyper-V template](../packer-hyperv/README.md). AVD Hybrid hosts must be single-session Windows 11 Enterprise (or Windows Server).
 

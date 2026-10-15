@@ -15,7 +15,7 @@ BeforeAll {
         AvdSubscriptionId     = 'avd-sub'
         AzlSubscriptionId     = 'azl-sub'
         GalleryImageVersionId = 'gallery-version-id'
-        ImageName             = 'img-lab'
+        ImageName             = 'img-demo'
         CustomLocationId      = 'custom-location-id'
         ImageResourceGroup    = 'image-rg'
         Location              = 'test-region'

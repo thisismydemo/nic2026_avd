@@ -2,7 +2,7 @@ variable "org" {
   type = string
 }
 
-variable "lab_token" {
+variable "naming_token" {
   type = string
 }
 
@@ -157,6 +157,6 @@ variable "secret_name_prefix" {
   type = string
   validation {
     condition     = length(var.secret_name_prefix) >= 3
-    error_message = "secret_name_prefix must be set (for example <org>-<lab>-); an empty prefix would share secret names between environments."
+    error_message = "secret_name_prefix must be set (for example <org>-<token>-); an empty prefix would share secret names between environments."
   }
 }

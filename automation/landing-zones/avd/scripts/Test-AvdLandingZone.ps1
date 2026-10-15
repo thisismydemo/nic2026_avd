@@ -65,7 +65,7 @@ Invoke-LzAvdCheck -Id '1' -Name 'Microsoft.DesktopVirtualization registered' -Te
 foreach ($key in 'rg_control', 'rg_net', 'rg_hosts', 'rg_img', 'rg_stor', 'rg_mon', 'rg_arc') {
     Invoke-LzAvdCheck -Id "2.$key" -Name "RG $($names[$key]) exists with project tag" -Test {
         $rg = Get-AzResourceGroup -Name $names[$key]
-        Assert-LzAvd ($rg.Tags -and $rg.Tags['project'] -eq $inputs.lab_token) 'project tag missing'; $rg.Location
+        Assert-LzAvd ($rg.Tags -and $rg.Tags['project'] -eq $inputs.naming_token) 'project tag missing'; $rg.Location
     }
 }
 

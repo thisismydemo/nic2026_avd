@@ -3,8 +3,8 @@ targetScope = 'resourceGroup'
 @description('Organization identifier; retained for manifest parity.')
 param org string
 
-@description('Lab token; retained for manifest parity.')
-param lab_token string
+@description('Naming token; retained for manifest parity.')
+param naming_token string
 
 param location string
 

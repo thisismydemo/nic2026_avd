@@ -5,8 +5,8 @@ variable "org" {
   type        = string
 }
 
-variable "lab_token" {
-  description = "Lab identifier."
+variable "naming_token" {
+  description = "Naming token."
   type        = string
 }
 

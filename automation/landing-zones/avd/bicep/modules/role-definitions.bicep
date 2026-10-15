@@ -11,7 +11,7 @@ resource aibImageRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' = {
   name: guid(subscription().id, names.role_aib_image)
   properties: {
     roleName: names.role_aib_image
-    description: 'Azure Image Builder: read the gallery and definitions, write image versions and managed images (lab)'
+    description: 'Azure Image Builder: read the gallery and definitions, write image versions and managed images'
     type: 'CustomRole'
     assignableScopes: [rgImgId]
     permissions: [

@@ -6,7 +6,7 @@ depends_on: [lz-avd]
 
 inputs:
   - { name: org, type: string, description: "Organization identifier.", required: true, source: environment }
-  - { name: lab_token, type: string, description: "Lab token.", required: true, source: environment, path: token }
+  - { name: naming_token, type: string, description: "Naming token.", required: true, source: environment, path: token }
   - { name: location, type: string, description: "Azure deployment region.", required: true, source: environment }
   - { name: location_short, type: string, description: "Short region identifier.", required: true, source: environment }
   - { name: tenant_id, type: string, description: "Microsoft Entra tenant ID.", required: true, source: environment }

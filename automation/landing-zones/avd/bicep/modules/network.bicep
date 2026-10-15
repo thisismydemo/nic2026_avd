@@ -80,7 +80,7 @@ module nsgHosts 'br/public:avm/res/network/network-security-group:0.5.3' = {
           sourcePortRange: '*'
           destinationAddressPrefix: avd_subnets.hosts
           destinationPortRange: '3389'
-          description: 'Admin RDP from the shared Bastion subnet and the lab jump subnet'
+          description: 'Admin RDP from the shared Bastion subnet and the jump subnet'
         }
       }
       {

@@ -5,7 +5,7 @@
     Live demo (owner, 14 Oct): creates a host pool, its desktop application group and the workspace registration, the same
     objects the portal's "Create a host pool" wizard creates, next to the pre-deployed pools. -Remove deletes them again.
 .DESCRIPTION
-    Inputs (G5, nothing lab-specific in this file): environment/avd/environment.yml
+    Inputs (G5, nothing environment-specific in this file): environment/avd/environment.yml
       subscription_id_avd, live_host_pool { name, app_group_name, workspace_name, resource_group, type, load_balancer,
       max_session_limit, friendly_name, tags }
     Steps, each idempotent and printed as it runs (the presenter talks over them):

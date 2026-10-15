@@ -136,12 +136,12 @@ Describe 'Remove-StrayAvdLzResources safety' {
         $stray = [pscustomobject]@{ ResourceId = "/subscriptions/$sub/resourceGroups/rg-old/providers/Microsoft.HybridCompute/machines/OLD-MACHINE"; Name = 'OLD-MACHINE'; ResourceType = 'Microsoft.HybridCompute/machines'; ResourceGroupName = 'rg-old'; Tags = @{} }
         $lockedDisk = [pscustomobject]@{ ResourceId = "/subscriptions/$sub/resourceGroups/rg-old/providers/Microsoft.Compute/disks/OLD-DISK"; Name = 'OLD-DISK'; ResourceType = 'Microsoft.Compute/disks'; ResourceGroupName = 'rg-old'; Tags = @{} }
         $blocker = [pscustomobject]@{ ResourceId = "/subscriptions/$sub/resourceGroups/rg-old/providers/Microsoft.RecoveryServices/vaults/OLD-RSV"; Name = 'OLD-RSV'; ResourceType = 'Microsoft.RecoveryServices/vaults'; ResourceGroupName = 'rg-old'; Tags = @{} }
-        $lab = [pscustomobject]@{ ResourceId = "/subscriptions/$sub/resourceGroups/rg-iic-nic26-avd-eus-01/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-iic-nic26-avd-hostpool-eus-01"; Name = 'id-iic-nic26-avd-hostpool-eus-01'; ResourceType = 'Microsoft.ManagedIdentity/userAssignedIdentities'; ResourceGroupName = 'rg-iic-nic26-avd-eus-01'; Tags = @{ project = 'nic26' } }
+        $environmentResource = [pscustomobject]@{ ResourceId = "/subscriptions/$sub/resourceGroups/rg-iic-nic26-avd-eus-01/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-iic-nic26-avd-hostpool-eus-01"; Name = 'id-iic-nic26-avd-hostpool-eus-01'; ResourceType = 'Microsoft.ManagedIdentity/userAssignedIdentities'; ResourceGroupName = 'rg-iic-nic26-avd-eus-01'; Tags = @{ project = 'nic26' } }
         $tagged = [pscustomobject]@{ ResourceId = "/subscriptions/$sub/resourceGroups/rg-other/providers/Microsoft.Storage/storageAccounts/plainname"; Name = 'plainname'; ResourceType = 'Microsoft.Storage/storageAccounts'; ResourceGroupName = 'rg-other'; Tags = @{ project = 'nic26' } }
         $oldRg = [pscustomobject]@{ ResourceId = "/subscriptions/$sub/resourceGroups/rg-old"; ResourceGroupName = 'rg-old'; Tags = @{} }
         $emptyRg = [pscustomobject]@{ ResourceId = "/subscriptions/$sub/resourceGroups/rg-empty"; ResourceGroupName = 'rg-empty'; Tags = @{} }
         $diskLock = [pscustomobject]@{ Name = 'keep'; ResourceId = "$($lockedDisk.ResourceId)/providers/Microsoft.Authorization/locks/keep"; Properties = [pscustomobject]@{ level = 'CanNotDelete'; notes = 'test' } }
-        $allResources = @($stray, $lockedDisk, $blocker, $lab, $tagged)
+        $allResources = @($stray, $lockedDisk, $blocker, $environmentResource, $tagged)
         $allGroups = @($oldRg, $emptyRg)
 
         function New-ApprovedList {
@@ -161,7 +161,7 @@ Describe 'Remove-StrayAvdLzResources safety' {
         }
         function Invoke-Discovery {
             param([string]$CandidatePath, [string]$AuditPath)
-            return (& $script:scriptPath -SubscriptionId $sub -LabToken 'nic26' -CandidateFile $CandidatePath -AuditFile $AuditPath 6>$null 3>$null)
+            return (& $script:scriptPath -SubscriptionId $sub -NamingToken 'nic26' -CandidateFile $CandidatePath -AuditFile $AuditPath 6>$null 3>$null)
         }
     }
     AfterAll {
@@ -213,8 +213,8 @@ Describe 'Remove-StrayAvdLzResources safety' {
     }
 
     It 'refuses -Execute without -TenantId or without an approved list' {
-        { & $script:scriptPath -SubscriptionId $sub -LabToken 'nic26' -CandidateFile $script:cand -AuditFile $script:audit -Execute -Confirm:$false 6>$null 3>$null } | Should -Throw '*TenantId*'
-        { & $script:scriptPath -SubscriptionId $sub -TenantId $tenant -LabToken 'nic26' -CandidateFile $script:cand -AuditFile $script:audit -Execute -Confirm:$false 6>$null 3>$null } | Should -Throw '*ConfirmDeleteList*'
+        { & $script:scriptPath -SubscriptionId $sub -NamingToken 'nic26' -CandidateFile $script:cand -AuditFile $script:audit -Execute -Confirm:$false 6>$null 3>$null } | Should -Throw '*TenantId*'
+        { & $script:scriptPath -SubscriptionId $sub -TenantId $tenant -NamingToken 'nic26' -CandidateFile $script:cand -AuditFile $script:audit -Execute -Confirm:$false 6>$null 3>$null } | Should -Throw '*ConfirmDeleteList*'
         Should -Invoke -CommandName Remove-AzResource -Times 0
     }
 
@@ -224,7 +224,7 @@ Describe 'Remove-StrayAvdLzResources safety' {
         $doc = Get-Content $script:cand -Raw | ConvertFrom-Json -AsHashtable
         $doc.items = @($stray.ResourceId); $doc.approvedBy = 'owner'; $doc.approvedOn = '2026-10-03'
         $doc | ConvertTo-Json -Depth 8 | Set-Content $list
-        { & $script:scriptPath -SubscriptionId $sub -TenantId $tenant -LabToken 'nic26' -CandidateFile $script:cand -AuditFile $script:audit -Execute -ConfirmDeleteList $list -Confirm:$false 6>$null 3>$null } | Should -Throw '*is not an object*'
+        { & $script:scriptPath -SubscriptionId $sub -TenantId $tenant -NamingToken 'nic26' -CandidateFile $script:cand -AuditFile $script:audit -Execute -ConfirmDeleteList $list -Confirm:$false 6>$null 3>$null } | Should -Throw '*is not an object*'
         Should -Invoke -CommandName Remove-AzResource -Times 0
     }
 
@@ -232,13 +232,13 @@ Describe 'Remove-StrayAvdLzResources safety' {
         Invoke-Discovery -CandidatePath $script:cand -AuditPath $script:audit | Out-Null
         $edits = @{ $stray.ResourceId = @{ approved = $true } }
         $wrong = New-ApprovedList -CandidatePath $script:cand -OutPath (Join-Path $TestDrive 'wrong.json') -Edits $edits -SubscriptionOverride $otherSub
-        { & $script:scriptPath -SubscriptionId $sub -TenantId $tenant -LabToken 'nic26' -CandidateFile $script:cand -AuditFile $script:audit -Execute -ConfirmDeleteList $wrong -Confirm:$false 6>$null 3>$null } | Should -Throw '*is for subscription*'
+        { & $script:scriptPath -SubscriptionId $sub -TenantId $tenant -NamingToken 'nic26' -CandidateFile $script:cand -AuditFile $script:audit -Execute -ConfirmDeleteList $wrong -Confirm:$false 6>$null 3>$null } | Should -Throw '*is for subscription*'
         $tampered = New-ApprovedList -CandidatePath $script:cand -OutPath (Join-Path $TestDrive 'tampered.json') -Edits $edits -Tamper
-        { & $script:scriptPath -SubscriptionId $sub -TenantId $tenant -LabToken 'nic26' -CandidateFile $script:cand -AuditFile $script:audit -Execute -ConfirmDeleteList $tampered -Confirm:$false 6>$null 3>$null } | Should -Throw '*itemsHash does not match*'
+        { & $script:scriptPath -SubscriptionId $sub -TenantId $tenant -NamingToken 'nic26' -CandidateFile $script:cand -AuditFile $script:audit -Execute -ConfirmDeleteList $tampered -Confirm:$false 6>$null 3>$null } | Should -Throw '*itemsHash does not match*'
         $stale = New-ApprovedList -CandidatePath $script:cand -OutPath (Join-Path $TestDrive 'stale.json') -Edits $edits -GeneratedOn ((Get-Date).ToUniversalTime().AddHours(-30).ToString('o'))
-        { & $script:scriptPath -SubscriptionId $sub -TenantId $tenant -LabToken 'nic26' -CandidateFile $script:cand -AuditFile $script:audit -Execute -ConfirmDeleteList $stale -Confirm:$false 6>$null 3>$null } | Should -Throw '*stale*'
+        { & $script:scriptPath -SubscriptionId $sub -TenantId $tenant -NamingToken 'nic26' -CandidateFile $script:cand -AuditFile $script:audit -Execute -ConfirmDeleteList $stale -Confirm:$false 6>$null 3>$null } | Should -Throw '*stale*'
         Should -Invoke -CommandName Remove-AzResource -Times 0
-        $result = & $script:scriptPath -SubscriptionId $sub -TenantId $tenant -LabToken 'nic26' -CandidateFile $script:cand -AuditFile $script:audit -Execute -ConfirmDeleteList $stale -AllowStaleList -Confirm:$false 6>$null 3>$null
+        $result = & $script:scriptPath -SubscriptionId $sub -TenantId $tenant -NamingToken 'nic26' -CandidateFile $script:cand -AuditFile $script:audit -Execute -ConfirmDeleteList $stale -AllowStaleList -Confirm:$false 6>$null 3>$null
         $result.Deleted | Should -Be @($stray.ResourceId)
         Should -Invoke -CommandName Remove-AzResource -Times 1 -Exactly
     }
@@ -259,7 +259,7 @@ Describe 'Remove-StrayAvdLzResources safety' {
         $sha = [System.Security.Cryptography.SHA256]::Create()
         $doc.itemsHash = ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes(($hashInput -join "`n") + "`n" + $sub))) -replace '-', '').ToLowerInvariant()
         $doc | ConvertTo-Json -Depth 8 | Set-Content $list
-        $result = & $script:scriptPath -SubscriptionId $sub -TenantId $tenant -LabToken 'nic26' -CandidateFile $script:cand -AuditFile $script:audit -Execute -ConfirmDeleteList $list -AllowStaleList -Confirm:$false 6>$null 3>$null
+        $result = & $script:scriptPath -SubscriptionId $sub -TenantId $tenant -NamingToken 'nic26' -CandidateFile $script:cand -AuditFile $script:audit -Execute -ConfirmDeleteList $list -AllowStaleList -Confirm:$false 6>$null 3>$null
         $result.Deleted | Should -Be @($stray.ResourceId)
         ($result.Refused | Where-Object { $_.Id -eq $foreign }).Reason | Should -Match 'outside the target subscription'
         ($result.Refused | Where-Object { $_.Id -eq $blocker.ResourceId }).Reason | Should -Match 'blocker'
@@ -278,7 +278,7 @@ Describe 'Remove-StrayAvdLzResources safety' {
         Invoke-Discovery -CandidatePath $script:cand -AuditPath $script:audit | Out-Null
         $list = New-ApprovedList -CandidatePath $script:cand -OutPath (Join-Path $TestDrive 'locks.json') -Edits @{ $lockedDisk.ResourceId = @{ approved = $true; removeLock = $true } }
         Mock -CommandName Remove-AzResource -MockWith { throw 'Conflict: disk is attached' }
-        { & $script:scriptPath -SubscriptionId $sub -TenantId $tenant -LabToken 'nic26' -CandidateFile $script:cand -AuditFile $script:audit -Execute -ConfirmDeleteList $list -RemoveLocks -Confirm:$false 6>$null 3>$null } | Should -Throw '*Stopped at first failure*'
+        { & $script:scriptPath -SubscriptionId $sub -TenantId $tenant -NamingToken 'nic26' -CandidateFile $script:cand -AuditFile $script:audit -Execute -ConfirmDeleteList $list -RemoveLocks -Confirm:$false 6>$null 3>$null } | Should -Throw '*Stopped at first failure*'
         Should -Invoke -CommandName Remove-AzResourceLock -Times 1 -Exactly
         Should -Invoke -CommandName New-AzResourceLock -Times 1 -Exactly -ParameterFilter { $LockName -eq 'keep' -and $LockLevel -eq 'CanNotDelete' }
         $auditDoc = Get-Content $script:audit -Raw | ConvertFrom-Json
@@ -286,11 +286,11 @@ Describe 'Remove-StrayAvdLzResources safety' {
         $auditDoc.result | Should -Be 'failed'
     }
 
-    It 'refuses to delete a resource that became lab-tagged after discovery (live re-read before acting)' {
+    It 'refuses to delete a resource that became token-tagged after discovery (live re-read before acting)' {
         Invoke-Discovery -CandidatePath $script:cand -AuditPath $script:audit | Out-Null
         $list = New-ApprovedList -CandidatePath $script:cand -OutPath (Join-Path $TestDrive 'toctou-tag.json') -Edits @{ $stray.ResourceId = @{ approved = $true } }
         Mock -CommandName Get-AzResource -ParameterFilter { $ResourceId } -MockWith { [pscustomobject]@{ ResourceId = $ResourceId; Name = 'OLD-MACHINE'; ResourceType = 'Microsoft.HybridCompute/machines'; ResourceGroupName = 'rg-old'; Tags = @{ project = 'nic26' } } }
-        $result = & $script:scriptPath -SubscriptionId $sub -TenantId $tenant -LabToken 'nic26' -CandidateFile $script:cand -AuditFile $script:audit -Execute -ConfirmDeleteList $list -AllowStaleList -Confirm:$false 6>$null 3>$null
+        $result = & $script:scriptPath -SubscriptionId $sub -TenantId $tenant -NamingToken 'nic26' -CandidateFile $script:cand -AuditFile $script:audit -Execute -ConfirmDeleteList $list -AllowStaleList -Confirm:$false 6>$null 3>$null
         @($result.Deleted).Count | Should -Be 0
         ($result.Refused | Where-Object { $_.Id -eq $stray.ResourceId }).Reason | Should -Match 'changed since discovery'
         Should -Invoke -CommandName Remove-AzResource -Times 0 -Exactly
@@ -306,7 +306,7 @@ Describe 'Remove-StrayAvdLzResources safety' {
             if ($global:Nic26TestLockCalls -le 1) { return @($diskLock) }
             return @($diskLock, [pscustomobject]@{ Name = 'new'; ResourceId = "$($stray.ResourceId)/providers/Microsoft.Authorization/locks/new"; Properties = [pscustomobject]@{ level = 'CanNotDelete'; notes = '' } })
         }
-        $result = & $script:scriptPath -SubscriptionId $sub -TenantId $tenant -LabToken 'nic26' -CandidateFile $script:cand -AuditFile $script:audit -Execute -ConfirmDeleteList $list -AllowStaleList -Confirm:$false 6>$null 3>$null
+        $result = & $script:scriptPath -SubscriptionId $sub -TenantId $tenant -NamingToken 'nic26' -CandidateFile $script:cand -AuditFile $script:audit -Execute -ConfirmDeleteList $list -AllowStaleList -Confirm:$false 6>$null 3>$null
         @($result.Deleted).Count | Should -Be 0
         ($result.Refused | Where-Object { $_.Id -eq $stray.ResourceId }).Reason | Should -Match 'locks changed since discovery'
         Should -Invoke -CommandName Remove-AzResource -Times 0 -Exactly
@@ -328,7 +328,7 @@ Describe 'Remove-StrayAvdLzResources safety' {
         Mock -CommandName Remove-AzKeyVault -MockWith { if ($InRemovedState) { $global:Nic26TestPurged = $true } else { $global:Nic26TestDeletedIds.Add($global:Nic26TestVault.ResourceId) } }
         Invoke-Discovery -CandidatePath $script:cand -AuditPath $script:audit | Out-Null
         $noPurge = New-ApprovedList -CandidatePath $script:cand -OutPath (Join-Path $TestDrive 'vault-nopurge.json') -Edits @{ $global:Nic26TestVault.ResourceId = @{ approved = $true } }
-        $r1 = & $script:scriptPath -SubscriptionId $sub -TenantId $tenant -LabToken 'nic26' -CandidateFile $script:cand -AuditFile $script:audit -Execute -ConfirmDeleteList $noPurge -AllowStaleList -Confirm:$false 6>$null 3>$null
+        $r1 = & $script:scriptPath -SubscriptionId $sub -TenantId $tenant -NamingToken 'nic26' -CandidateFile $script:cand -AuditFile $script:audit -Execute -ConfirmDeleteList $noPurge -AllowStaleList -Confirm:$false 6>$null 3>$null
         $r1.Deleted | Should -Be @($global:Nic26TestVault.ResourceId)
         Should -Invoke -CommandName Remove-AzKeyVault -Times 1 -Exactly -ParameterFilter { -not $InRemovedState }
         Should -Invoke -CommandName Remove-AzKeyVault -Times 0 -Exactly -ParameterFilter { $InRemovedState }
@@ -337,7 +337,7 @@ Describe 'Remove-StrayAvdLzResources safety' {
         $global:Nic26TestDeletedIds.Clear()
         Invoke-Discovery -CandidatePath $script:cand -AuditPath $script:audit | Out-Null
         $withPurge = New-ApprovedList -CandidatePath $script:cand -OutPath (Join-Path $TestDrive 'vault-purge.json') -Edits @{ $global:Nic26TestVault.ResourceId = @{ approved = $true; purge = $true } }
-        $null = & $script:scriptPath -SubscriptionId $sub -TenantId $tenant -LabToken 'nic26' -CandidateFile $script:cand -AuditFile $script:audit -Execute -ConfirmDeleteList $withPurge -AllowStaleList -Confirm:$false 6>$null 3>$null
+        $null = & $script:scriptPath -SubscriptionId $sub -TenantId $tenant -NamingToken 'nic26' -CandidateFile $script:cand -AuditFile $script:audit -Execute -ConfirmDeleteList $withPurge -AllowStaleList -Confirm:$false 6>$null 3>$null
         Should -Invoke -CommandName Remove-AzKeyVault -Times 1 -Exactly -ParameterFilter { $InRemovedState }
         $global:Nic26TestPurged | Should -BeTrue
     }
@@ -345,14 +345,14 @@ Describe 'Remove-StrayAvdLzResources safety' {
     It '-Execute -WhatIf validates the approved list but deletes nothing' {
         Invoke-Discovery -CandidatePath $script:cand -AuditPath $script:audit | Out-Null
         $list = New-ApprovedList -CandidatePath $script:cand -OutPath (Join-Path $TestDrive 'whatif.json') -Edits @{ $stray.ResourceId = @{ approved = $true } }
-        $result = & $script:scriptPath -SubscriptionId $sub -TenantId $tenant -LabToken 'nic26' -CandidateFile $script:cand -AuditFile $script:audit -Execute -ConfirmDeleteList $list -WhatIf 6>$null 3>$null
+        $result = & $script:scriptPath -SubscriptionId $sub -TenantId $tenant -NamingToken 'nic26' -CandidateFile $script:cand -AuditFile $script:audit -Execute -ConfirmDeleteList $list -WhatIf 6>$null 3>$null
         $result.Mode | Should -Be 'execute-whatif'
         @($result.Deleted).Count | Should -Be 0
         Should -Invoke -CommandName Remove-AzResource -Times 0
         $auditDoc = Get-Content $script:audit -Raw | ConvertFrom-Json
         ($auditDoc.actions | Where-Object { $_.status -eq 'whatif' }).id | Should -Be $stray.ResourceId
         $bad = New-ApprovedList -CandidatePath $script:cand -OutPath (Join-Path $TestDrive 'whatif-bad.json') -Edits @{ $stray.ResourceId = @{ approved = $true } } -Tamper
-        { & $script:scriptPath -SubscriptionId $sub -TenantId $tenant -LabToken 'nic26' -CandidateFile $script:cand -AuditFile $script:audit -Execute -ConfirmDeleteList $bad -WhatIf 6>$null 3>$null } | Should -Throw '*itemsHash*'
+        { & $script:scriptPath -SubscriptionId $sub -TenantId $tenant -NamingToken 'nic26' -CandidateFile $script:cand -AuditFile $script:audit -Execute -ConfirmDeleteList $bad -WhatIf 6>$null 3>$null } | Should -Throw '*itemsHash*'
     }
 
     It 'the resource-group phase only deletes approved, empty, unlocked groups after full re-enumeration and never deletes resources' {
@@ -362,7 +362,7 @@ Describe 'Remove-StrayAvdLzResources safety' {
             $oldRg.ResourceId   = @{ approved = $true }   # not empty -> skipped
             $emptyRg.ResourceId = @{ approved = $true }   # empty -> deleted
         }
-        $result = & $script:scriptPath -SubscriptionId $sub -TenantId $tenant -LabToken 'nic26' -CandidateFile $script:cand -AuditFile $script:audit -Execute -ConfirmDeleteList $list -DeleteEmptyResourceGroups -Confirm:$false 6>$null 3>$null
+        $result = & $script:scriptPath -SubscriptionId $sub -TenantId $tenant -NamingToken 'nic26' -CandidateFile $script:cand -AuditFile $script:audit -Execute -ConfirmDeleteList $list -DeleteEmptyResourceGroups -Confirm:$false 6>$null 3>$null
         $result.Mode | Should -Be 'execute-resource-groups'
         $result.Deleted | Should -Be @($emptyRg.ResourceId)
         ($result.Skipped | Where-Object { $_.id -eq $oldRg.ResourceId }).reason | Should -Match 'not empty'
@@ -396,7 +396,7 @@ Describe 'New-AvdLzTeardownPlan safety' {
         # resource groups come before subscription-scope objects, hub peering before resource groups
         ($items | Where-Object Kind -EQ 'peering' | Select-Object -First 1).Order | Should -BeLessThan ($items | Where-Object Kind -EQ 'resourceGroup' | Select-Object -First 1).Order
         ($items | Where-Object Kind -EQ 'resourceGroup' | Select-Object -Last 1).Order | Should -BeLessThan ($items | Where-Object Kind -EQ 'budget').Order
-        # every item carries the lab token
+        # every item carries the naming token
         @($items | Where-Object { $_.Id -notmatch 'nic26' }).Count | Should -Be 0
         Should -Invoke -CommandName Remove-AzResource -Times 0
         Should -Invoke -CommandName Remove-AzResourceGroup -Times 0

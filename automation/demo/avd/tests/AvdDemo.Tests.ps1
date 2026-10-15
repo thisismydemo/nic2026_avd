@@ -28,7 +28,7 @@ BeforeAll {
         org = 'iic'; token = 'nic26'; location_short = 'eus'; location = 'eastus'
         tenant_domain = 'contoso.com'; tenant_id = '00000000-0000-0000-0000-000000000000'
         subscriptions = @{ avd = '00000000-0000-0000-0000-000000000000' }
-        owner_email = 'lab-owner@contoso.com'; screen_hidden_terms = @('acmecorp')
+        owner_email = 'owner@contoso.com'; screen_hidden_terms = @('acmecorp')
         log_analytics_workspace_id = ''
         entra_groups = @{ avd_azure = 'grp-iic-nic26-avd-azure'; avd_azl = 'grp-iic-nic26-avd-azl'; avd_hybrid = 'grp-iic-nic26-avd-hybrid' }
         demo_users = @(@{ upn = 'user1@contoso.com'; display_name = 'User 1'; realm = 'azure' }, @{ upn = 'user2@contoso.com'; display_name = 'User 2'; realm = 'azl' })

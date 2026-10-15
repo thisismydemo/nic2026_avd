@@ -79,7 +79,7 @@ module dcr 'br/public:avm/res/insights/data-collection-rule:0.11.0' = {
       destinations: {
         logAnalytics: [
           {
-            name: 'lawLab'
+            name: 'lawMain'
             workspaceResourceId: log_analytics_workspace_id
           }
         ]
@@ -87,14 +87,14 @@ module dcr 'br/public:avm/res/insights/data-collection-rule:0.11.0' = {
       dataFlows: [
         {
           streams: ['Microsoft-Perf', 'Microsoft-Event']
-          destinations: ['lawLab']
+          destinations: ['lawMain']
         }
       ]
     }
   }
 }
 
-// Alert rules — design §9.2 (scheduled query rules on the lab workspace, routed to the ops action group)
+// Alert rules — design §9.2 (scheduled query rules on the Log Analytics workspace, routed to the ops action group)
 var alerts = [
   {
     name: names.alert_hostunavailable

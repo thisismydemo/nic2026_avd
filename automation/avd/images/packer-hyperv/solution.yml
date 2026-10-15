@@ -6,7 +6,7 @@ depends_on: [lz-azure-local]
 
 inputs:
   - { name: org, type: string, description: "Organization identifier.", required: true, source: environment }
-  - { name: lab_token, type: string, description: "Lab token.", required: true, source: environment, path: token }
+  - { name: naming_token, type: string, description: "Naming token.", required: true, source: environment, path: token }
   - { name: hybrid_csv_path, type: string, description: "Azure Local cluster shared volume root.", required: true, source: environment, path: hybrid.csv_path }
   - { name: compute_switch_name, type: string, description: "Hyper-V compute switch of the build VM.", required: true, source: environment, path: hybrid.compute_switch_name }
   - { name: hybrid_vlan_id, type: int, description: "VLAN of the build VM.", required: true, source: environment, path: hybrid.vlan_id }

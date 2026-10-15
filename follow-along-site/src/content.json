@@ -5,7 +5,7 @@
   "date": "Wed 14 Oct 2026, 13:20 (W. Europe Time)",
   "length": 60,
   "level": 400,
-  "followAlongPolicy": "Full follow-along: every demo has an attendee version. Azure and the portability pattern need no special hardware; Azure Local and Hybrid steps are hypervisor-agnostic with lab values as variables.",
+  "followAlongPolicy": "Full follow-along: every demo has an attendee version. Azure and the portability pattern need no special hardware; Azure Local and Hybrid steps are hypervisor-agnostic with your values as variables.",
   "variables": [
     {
       "name": "<sub>",
@@ -39,56 +39,56 @@
   "sections": [
     {
       "id": "0",
-      "title": "Open — three terminals, one desktop",
-      "minutes": 2
+      "title": "Check-in — what we will do today, what AVD is, AVD Anywhere",
+      "minutes": 4
     },
     {
       "id": "1",
-      "title": "Terminals compared — five decision axes",
+      "title": "The foundation",
       "minutes": 2
     },
     {
       "id": "2",
-      "title": "The foundation, network and failure domains",
-      "minutes": 3
-    },
-    {
-      "id": "2B",
-      "title": "Identity — one identity, three paths",
-      "minutes": 5
+      "title": "AVD on Azure",
+      "minutes": 4
     },
     {
       "id": "3",
-      "title": "AVD on Azure",
-      "minutes": 6
+      "title": "AVD on Azure Local",
+      "minutes": 10
     },
     {
       "id": "4",
-      "title": "AVD on Azure Local",
-      "minutes": 6
-    },
-    {
-      "id": "5",
       "title": "AVD Hybrid",
       "minutes": 7
     },
     {
-      "id": "6",
-      "title": "Profiles — one pattern for three terminals",
-      "minutes": 8
-    },
-    {
-      "id": "7",
-      "title": "The automation and the operating model",
+      "id": "5",
+      "title": "Identity — one identity, three paths",
       "minutes": 4
     },
     {
+      "id": "6",
+      "title": "Profiles — one pattern for three terminals",
+      "minutes": 7
+    },
+    {
+      "id": "7",
+      "title": "One repo, one monitoring layer",
+      "minutes": 2
+    },
+    {
       "id": "8",
-      "title": "The connecting flight — live end-to-end demo",
+      "title": "The connecting flight — the live end-to-end demo",
       "minutes": 13
     },
     {
       "id": "9",
+      "title": "Choose your terminal — five decision axes, support, ownership",
+      "minutes": 3
+    },
+    {
+      "id": "10",
       "title": "Take-home, tomorrow's session, other sessions, close",
       "minutes": 2
     }
@@ -100,13 +100,13 @@
   "demos": [
     {
       "id": "a0-three-pools",
-      "title": "One workspace, three host pools, all Available",
+      "title": "One workspace, three host pools, every running host Available",
       "section": "0",
       "mode": "live",
       "minutes": 0.25,
       "followAlong": {
-        "level": "full",
-        "goal": "See your own workspace, host pools and session host status in one view.",
+        "level": "none",
+        "goal": "Nothing to run yet: this is the end state the session builds. Your hands-on starts at the foundation demo (slide 10); come back to this check once you have host pools",
         "needs": [
           "An AVD workspace with at least one host pool",
           "Az.DesktopVirtualization module"
@@ -133,7 +133,7 @@
     {
       "id": "a2-foundation-as-code",
       "title": "The foundation as code",
-      "section": "2",
+      "section": "1",
       "mode": "live",
       "minutes": 0.75,
       "followAlong": {
@@ -169,9 +169,525 @@
       }
     },
     {
+      "id": "a3e-live-deploy-azure",
+      "title": "Deploy it live: a host pool and a session host on Azure",
+      "section": "2",
+      "mode": "live",
+      "minutes": 1,
+      "followAlong": {
+        "level": "full",
+        "goal": "Create a host pool and add a session host, in the portal or with the scripts in the repo.",
+        "needs": [
+          "An Azure subscription with the Microsoft.DesktopVirtualization provider registered",
+          "A virtual network subnet and an image (marketplace Windows 11 multi-session is fine)",
+          "The repo, pwsh 7, Az modules"
+        ],
+        "steps": [
+          {
+            "title": "Portal: create the host pool",
+            "instructions": "Azure Virtual Desktop > Host pools > + Create: pooled, breadth-first; on Virtual machines add one VM (image, size, Entra join); on Workspace register the desktop application group. Review + create.",
+            "command": "",
+            "check": "The pool, its desktop application group and the workspace registration exist; the VM shows Available under Session hosts."
+          },
+          {
+            "title": "Script: create the host pool",
+            "instructions": "Set live_host_pool in environment/avd/environment.yml to your names, then run the script.",
+            "command": "./automation/avd/control-plane/scripts/New-AvdLiveHostPool.ps1 -Execute",
+            "check": "The script prints the host pool, the application group and the workspace with one more reference."
+          },
+          {
+            "title": "Script: add a session host",
+            "instructions": "Copy the example parameter file, set your names, deploy, then register the VM to the pool with a token generated at run time.",
+            "command": "./automation/avd/session-hosts-azure/scripts/Invoke-SessionHostsAzureDeploy.ps1 -Mode Bicep -SubscriptionId <sub> -ResourceGroupName <rg> -ParameterFile <your parameter file> -AdminUsernameRef keyvault://<vault>/<secret> -AdminPasswordRef keyvault://<vault>/<secret> -Execute",
+            "check": "The new VM shows Available under the host pool's Session hosts."
+          }
+        ],
+        "troubleshooting": [
+          "Host stays Unavailable: check outbound 443 to the AVD endpoints and that the registration token was not expired."
+        ],
+        "cleanup": [
+          "New-AvdLiveHostPool.ps1 -Remove -Execute; delete the VM and its NIC and disk."
+        ],
+        "repoPaths": [
+          "automation/avd/control-plane",
+          "automation/avd/session-hosts-azure"
+        ]
+      }
+    },
+    {
+      "id": "a3a-azure-host-pool",
+      "title": "AVD on Azure: host pool and session hosts",
+      "section": "2",
+      "mode": "live",
+      "minutes": 0.25,
+      "followAlong": {
+        "level": "full",
+        "goal": "Create a pooled host pool, desktop application group and workspace. The pool has no session hosts yet: add one from the host pool (Session hosts > Add) with the marketplace image, or with your own image from the next demo; the Insights and DCR demos need it",
+        "needs": [
+          "Az.DesktopVirtualization",
+          "Microsoft.DesktopVirtualization provider registered",
+          "A resource group"
+        ],
+        "steps": [
+          {
+            "title": "Create the host pool",
+            "instructions": "Create a pooled, breadth-first host pool with a session limit.",
+            "command": "$hp = New-AzWvdHostPool -ResourceGroupName <rg> -Name hp-demo-azure -Location <location> -HostPoolType Pooled -LoadBalancerType BreadthFirst -PreferredAppGroupType Desktop -MaxSessionLimit 4",
+            "check": "Get-AzWvdHostPool returns hp-demo-azure."
+          },
+          {
+            "title": "Create the desktop application group",
+            "instructions": "Create a desktop application group for the pool.",
+            "command": "$ag = New-AzWvdApplicationGroup -ResourceGroupName <rg> -Name ag-demo-azure -Location <location> -HostPoolArmPath $hp.Id -ApplicationGroupType Desktop",
+            "check": "The application group lists the host pool."
+          },
+          {
+            "title": "Create the workspace and register the group",
+            "instructions": "Create the workspace and add the application group.",
+            "command": "New-AzWvdWorkspace -ResourceGroupName <rg> -Name ws-demo -Location <location> -ApplicationGroupReference $ag.Id",
+            "check": "The workspace lists the application group."
+          },
+          {
+            "title": "Entitle a user group",
+            "instructions": "Assign the Desktop Virtualization User role on the application group.",
+            "command": "New-AzRoleAssignment -ObjectId <group object id> -RoleDefinitionName 'Desktop Virtualization User' -Scope $ag.Id",
+            "check": "The users appear on the application group's assignments."
+          }
+        ],
+        "troubleshooting": [
+          "Provider not registered: Register-AzResourceProvider -ProviderNamespace Microsoft.DesktopVirtualization."
+        ],
+        "cleanup": [
+          "Remove the workspace, application group and host pool when finished."
+        ],
+        "repoPaths": [
+          "automation/avd/control-plane"
+        ]
+      }
+    },
+    {
+      "id": "a3b-image-builder",
+      "title": "One image artifact: Image Builder to gallery to host pool",
+      "section": "2",
+      "mode": "live+recorded",
+      "minutes": 0.25,
+      "followAlong": {
+        "level": "full",
+        "goal": "Build a Windows 11 multi-session image with Azure Image Builder into a Compute Gallery. The build takes 45 to 90 minutes: start it and move on",
+        "needs": [
+          "Compute Gallery with an image definition",
+          "Image Builder identity with the gallery roles",
+          "Microsoft.VirtualMachineImages provider registered"
+        ],
+        "steps": [
+          {
+            "title": "Resolve an exact source image version",
+            "instructions": "Pin an exact marketplace version for reproducibility (Image Builder also accepts latest, resolved at build time).",
+            "command": "./automation/avd/images/azure/scripts/Get-PlatformImageVersion.ps1 -Location <location> -Publisher MicrosoftWindowsDesktop -Offer office-365 -Sku win11-25h2-avd-m365",
+            "check": "An exact version number is returned."
+          },
+          {
+            "title": "Deploy the template",
+            "instructions": "Deploy the Image Builder template from the repo with your gallery and identity.",
+            "command": "az deployment group create -g <rg> --template-file automation/avd/images/azure/bicep/main.bicep --parameters <your parameter file>",
+            "check": "The template shows provisioning Succeeded."
+          },
+          {
+            "title": "Start the build",
+            "instructions": "Start the build; it takes 45 to 90 minutes.",
+            "command": "./automation/avd/images/azure/scripts/Start-ImageBuild.ps1 -SubscriptionId <sub> -ResourceGroupName <rg> -Execute",
+            "check": "Run state moves to Running, then Succeeded."
+          },
+          {
+            "title": "Confirm the gallery image version",
+            "instructions": "List the versions of the image definition.",
+            "command": "Get-AzGalleryImageVersion -ResourceGroupName <rg> -GalleryName <gallery> -GalleryImageDefinitionName <definition> | Select-Object Name, ProvisioningState",
+            "check": "A new version with ProvisioningState Succeeded."
+          }
+        ],
+        "troubleshooting": [
+          "Build fails at the customiser: open the staging resource group's customization log."
+        ],
+        "cleanup": [
+          "Delete the image template and old image versions to avoid storage cost."
+        ],
+        "repoPaths": [
+          "automation/avd/images/azure"
+        ]
+      }
+    },
+    {
+      "id": "a3c-avd-insights",
+      "title": "AVD Insights",
+      "section": "2",
+      "mode": "live",
+      "minutes": 0.5,
+      "followAlong": {
+        "level": "full",
+        "goal": "Enable AVD Insights for a host pool. Needs a session host from the host-pool demo, running long enough to send data (best the next day)",
+        "needs": [
+          "A Log Analytics workspace",
+          "Session hosts with Azure Monitor Agent"
+        ],
+        "steps": [
+          {
+            "title": "Open Insights and run the configuration workbook",
+            "instructions": "In the portal open Azure Virtual Desktop > Insights, select the subscription, and use Open configuration workbook.",
+            "command": "",
+            "check": "The configuration workbook reports diagnostics enabled for the host pool and workspace."
+          },
+          {
+            "title": "Associate the Insights data collection rule with the hosts",
+            "instructions": "Create the data collection rule from the workbook and associate it with the session hosts.",
+            "command": "",
+            "check": "Host performance counters and events appear after the first collection interval."
+          }
+        ],
+        "troubleshooting": [
+          "No data: allow time for the first collection; confirm the Azure Monitor Agent is installed."
+        ],
+        "cleanup": [
+          "Delete the data collection rule and association if it was a test."
+        ],
+        "repoPaths": [
+          "handouts/Deployment_Checklist.md"
+        ]
+      }
+    },
+    {
+      "id": "a3d-dcr-cost",
+      "title": "Data collection rules that keep costs sane",
+      "section": "2",
+      "mode": "live",
+      "minutes": 0.25,
+      "followAlong": {
+        "level": "full",
+        "goal": "Measure what your session hosts cost to monitor and keep only what you need. Needs a session host from the host-pool demo, running long enough to send data (best the next day)",
+        "needs": [
+          "A Log Analytics workspace with host data"
+        ],
+        "steps": [
+          {
+            "title": "Measure ingestion by table",
+            "instructions": "Run the query in your workspace.",
+            "command": "Usage | where TimeGenerated > ago(30d) | where IsBillable == true | summarize GB = sum(Quantity)/1000.0 by DataType | order by GB desc",
+            "check": "A ranked list of tables by billable GB."
+          },
+          {
+            "title": "Review the DCR data sources",
+            "instructions": "Open the data collection rule and review counters, sampling rates and event channels; remove what you do not use.",
+            "command": "",
+            "check": "Only the counters and channels that Insights and your alerts need remain."
+          }
+        ],
+        "troubleshooting": [],
+        "cleanup": [
+          "None."
+        ],
+        "repoPaths": [
+          "automation/landing-zones/avd"
+        ]
+      }
+    },
+    {
+      "id": "a3f-publish-apps",
+      "title": "Publish apps live: a RemoteApp application group on Terminal A",
+      "section": "2",
+      "mode": "live",
+      "minutes": 0.5,
+      "followAlong": {
+        "level": "full",
+        "goal": "Publish applications with RemoteApp on an existing pooled host pool, in the portal or with the script in the repo.",
+        "needs": [
+          "A pooled host pool with at least one Available session host and a workspace",
+          "Owner or User Access Administrator on the resource group (for the assignment)",
+          "The repo, pwsh 7, Az modules"
+        ],
+        "steps": [
+          {
+            "title": "Portal: create the RemoteApp group",
+            "instructions": "Azure Virtual Desktop > Application groups > + Create: your host pool, type RemoteApp; Applications: + Add applications from the Start menu; Assignments: your users group; Workspace: register. Review + create.",
+            "command": "",
+            "check": "The group lists the apps; the workspace references it; the assigned users see the apps after a feed refresh."
+          },
+          {
+            "title": "Script: publish the apps",
+            "instructions": "Set remote_apps in environment/avd/environment.yml (pool, group name, assigned group, Start menu item names), run the plan, then -Execute.",
+            "command": "./automation/avd/control-plane/scripts/New-AvdRemoteApps.ps1 -Execute",
+            "check": "The script prints the group, each app 'published' and the workspace with one more reference."
+          }
+        ],
+        "troubleshooting": [
+          "Apps not in the feed: the pool's preferred application group type is Desktop and the user also has the desktop; use a separate group or set the preferred type to RemoteApp.",
+          "Start menu item not found: the script lists the available names; Store apps (Notepad, Calculator, Paint on Windows 11) are not in the list."
+        ],
+        "cleanup": [
+          "New-AvdRemoteApps.ps1 -Remove -Execute."
+        ],
+        "repoPaths": [
+          "automation/avd/control-plane"
+        ]
+      }
+    },
+    {
+      "id": "a4d-live-deploy-azl",
+      "title": "Deploy it live: a session host on Azure Local",
+      "section": "3",
+      "mode": "live",
+      "minutes": 1,
+      "followAlong": {
+        "level": "read",
+        "goal": "Understand how a session host is added on Azure Local, in the portal or with the script; the steps need an Azure Local cluster.",
+        "needs": [
+          "An Azure Local cluster with an Arc resource bridge, a custom location, a logical network and an image (not required to read)"
+        ],
+        "steps": [
+          {
+            "title": "Portal: add a session host",
+            "instructions": "Host pool > Session hosts > + Add > Virtual machines: Azure Local, custom location, image, logical network, AD DS join.",
+            "command": "",
+            "check": "The new Azure Local VM shows Available under the host pool's Session hosts."
+          },
+          {
+            "title": "Script: add a session host",
+            "instructions": "Add the host to azl_session_hosts.hosts in environment/avd/environment.yml, then build only that host.",
+            "command": "./automation/avd/session-hosts-azure-local/scripts/Invoke-AzlSessionHostBuild.ps1 -EnvironmentFile environment/avd/environment.yml -VmName <vm name> -Execute",
+            "check": "The new VM shows Available under the host pool's Session hosts."
+          }
+        ],
+        "troubleshooting": [
+          "Host never Available: check the guest has a default gateway and reaches the AVD endpoints on 443."
+        ],
+        "cleanup": [
+          "Delete the VM and its NIC, and remove the session host from the pool."
+        ],
+        "repoPaths": [
+          "automation/avd/session-hosts-azure-local"
+        ]
+      }
+    },
+    {
+      "id": "a4a-azure-local-host-pool",
+      "title": "AVD on Azure Local: host pool and a session host as an Azure Local VM",
+      "section": "3",
+      "mode": "live",
+      "minutes": 0.9,
+      "followAlong": {
+        "level": "read",
+        "goal": "Understand how an Azure Local VM becomes an AVD session host; the steps need an Azure Local cluster.",
+        "needs": [
+          "An Azure Local cluster with an Arc Resource Bridge and a custom location (not required to read)"
+        ],
+        "steps": [
+          {
+            "title": "Create the VM from Azure",
+            "instructions": "Create an Azure Local VM from a gallery image on a logical network, then register it to the host pool with a registration token passed in memory.",
+            "command": "az stack-hci-vm create --name <vm> --resource-group <rg> --custom-location <custom location id> --image <image name> --admin-username <admin> --admin-password <read from a secure prompt, never typed into a script> --nics <nic name> --storage-path-id <storage path id>",
+            "check": "The VM lists as Succeeded under Azure Local virtual machines."
+          },
+          {
+            "title": "Register to the host pool",
+            "instructions": "Run the registration step with a token generated at deploy time.",
+            "command": "./automation/avd/session-hosts-azure-local/scripts/Register-AvdSessionHostsAzureLocal.ps1 -SubscriptionId <sub> -ResourceGroupName <vm rg> -HostPoolResourceGroup <rg> -HostPoolName <pool> -TokenScriptPath ./automation/avd/control-plane/scripts/New-AvdRegistrationToken.ps1 -Execute",
+            "check": "The host appears Available in the pool."
+          }
+        ],
+        "troubleshooting": [
+          "Host Unavailable: check outbound access to the AVD service URLs from the logical network."
+        ],
+        "cleanup": [
+          "Delete the VM and remove the session host from the pool."
+        ],
+        "repoPaths": [
+          "automation/avd/session-hosts-azure-local"
+        ]
+      }
+    },
+    {
+      "id": "a4c-sizing-guides",
+      "title": "Sizing AVD on Azure Local: the two public guides and the demo's numbers",
+      "section": "3",
+      "mode": "live",
+      "minutes": 0.75,
+      "followAlong": {
+        "level": "full",
+        "goal": "Size an AVD solution on Azure Local bottom-up for your own users: session hosts and the SOFS that serves the FSLogix profiles.",
+        "needs": [
+          "A browser: https://azurelocal.cloud/azurelocal-avd/ and https://azurelocal.cloud/azurelocal-sofs-fslogix/architecture/capacity-planning/",
+          "Your user count, profile size per user type and growth estimate",
+          "Your cluster's node count, capacity drives per node and memory per node"
+        ],
+        "steps": [
+          {
+            "title": "Read the AVD on Azure Local architecture",
+            "instructions": "Open https://azurelocal.cloud/azurelocal-avd/ and read the Architecture and Deployment Scenarios pages: session hosts are Azure Local VMs on a logical network, managed from Azure. Pick the scenario closest to yours and size the session hosts from user density (vCPU and memory per user).",
+            "command": "",
+            "check": "You have a session-host count and size (vCPU, memory, OS disk) for your users."
+          },
+          {
+            "title": "Size the profile storage",
+            "instructions": "Open https://azurelocal.cloud/azurelocal-sofs-fslogix/architecture/capacity-planning/ and compare https://azurelocal.cloud/azurelocal-sofs-fslogix/architecture/scenarios/. Compute usable = users × profile size × (1 + growth); guest pool = usable × guest mirror copies; data disks per VM = pool ÷ SOFS VMs; host volume per VM = OS disk + data disks + overhead; raw = host volumes × host mirror copies. Worked example from the session (two hosts): 20 users × 30 GB + 20 % = 720 GB usable → 1.44 TB guest two-way pool → 2 VMs × 4 × 256 GB (one disk per VM kept as repair reserve) → two 1.5 TiB host volumes → 6 TiB raw. On two hosts use two SOFS VMs, one per host, with a cloud witness: a third VM would share a host and losing that host would take the guest quorum.",
+            "command": "",
+            "check": "You have usable, guest pool, data-disk, host-volume and raw figures for the profiles."
+          },
+          {
+            "title": "Check the fit on the cluster",
+            "instructions": "Add the session-host and other VM volumes to the profile volumes, keep one capacity drive per node unallocated as the repair reserve, and check that every VM can restart on the remaining nodes when one node is down (vCPU and memory).",
+            "command": "",
+            "check": "Allocated volumes fit inside usable capacity minus the reserve, and the VMs fit on N-1 nodes."
+          }
+        ],
+        "troubleshooting": [
+          "Raw-to-usable looks far worse than 4:1 at small scale: the fixed OS disks and the second mirror dominate small designs; compare the guide's small-shop scenario.",
+          "Does not fit on N-1 nodes: reduce density per host, add a node, or accept that some VMs stay down during a node outage, and write that down."
+        ],
+        "cleanup": [
+          "None: nothing is deployed."
+        ],
+        "repoPaths": [
+          "handouts/Platform_Comparison.md"
+        ]
+      }
+    },
+    {
+      "id": "a4b-gpu-evidence",
+      "title": "GPU on Azure Local: one L4 by DDA on a dedicated session host",
+      "section": "3",
+      "mode": "live+recorded",
+      "minutes": 0.5,
+      "followAlong": {
+        "level": "read",
+        "goal": "Understand GPU by DDA versus GPU partitioning on Azure Local, what the free driver gives (compute and AI) and what desktop graphics acceleration needs (NVIDIA vWS licensing).",
+        "needs": [],
+        "steps": [],
+        "troubleshooting": [],
+        "cleanup": [],
+        "repoPaths": [
+          "automation/avd/session-hosts-azure-local"
+        ]
+      }
+    },
+    {
+      "id": "a5c-live-deploy-hybrid",
+      "title": "Deploy it live: an AVD Hybrid session host",
+      "section": "4",
+      "mode": "live",
+      "minutes": 1,
+      "followAlong": {
+        "level": "full",
+        "goal": "Turn a Windows VM on any hypervisor into an AVD Hybrid session host with the scripts in the repo.",
+        "needs": [
+          "A Windows 11 Enterprise (single-session) VM on your hypervisor; multi-session is not supported on Hybrid",
+          "Rights to onboard Arc machines and a host pool created without VMs"
+        ],
+        "steps": [
+          {
+            "title": "Script: build and register",
+            "instructions": "Describe the VM in hybrid.vms in environment/avd/environment.yml (or use your own VM and the Arc and extension steps of the earlier demos).",
+            "command": "./automation/avd/session-hosts-hybrid/scripts/Invoke-HybridHostBuild.ps1 -EnvironmentFile environment/avd/environment.yml -VmName <vm name> -Execute",
+            "check": "The build ends with Registered True, Status Available."
+          }
+        ],
+        "troubleshooting": [
+          "Host never Available: check the Arc agent is Connected and the extension log under C:\\Packages\\Plugins."
+        ],
+        "cleanup": [
+          "Remove the session host from the pool, the Arc machine and the VM."
+        ],
+        "repoPaths": [
+          "automation/avd/session-hosts-hybrid"
+        ]
+      }
+    },
+    {
+      "id": "a5a-hyperv-arc",
+      "title": "Plain Hyper-V VMs seen in Azure only as Arc machines",
+      "section": "4",
+      "mode": "live",
+      "minutes": 0.75,
+      "followAlong": {
+        "level": "full",
+        "goal": "Make an ordinary Windows VM on any hypervisor an Arc-enabled server.",
+        "needs": [
+          "A Windows 11 Enterprise VM (any hypervisor)",
+          "Rights to onboard Arc machines (Azure Connected Machine Onboarding on the resource group)",
+          "Outbound access to the Arc endpoints"
+        ],
+        "steps": [
+          {
+            "title": "Create the onboarding principal",
+            "instructions": "Create a service principal scoped only to the Arc resource group.",
+            "command": "$sp = New-AzADServicePrincipal -DisplayName spn-arc-onboard\nNew-AzRoleAssignment -ObjectId $sp.Id -RoleDefinitionName 'Azure Connected Machine Onboarding' -Scope /subscriptions/<sub>/resourceGroups/<arc rg>",
+            "check": "The role assignment exists on the Arc resource group."
+          },
+          {
+            "title": "Install and connect the Connected Machine agent in the guest",
+            "instructions": "In the guest, in an elevated session, download and run AzureConnectedMachineAgent.msi from the Microsoft download link in the Azure Arc documentation, then run the onboarding. Pass the secret in memory and never store it.",
+            "command": "azcmagent connect --service-principal-id <app id> --service-principal-secret <secret> --tenant-id <tenant> --subscription-id <sub> --resource-group <arc rg> --location <location> --resource-name <vm name>",
+            "check": "azcmagent show reports Connected."
+          }
+        ],
+        "troubleshooting": [
+          "Agent cannot connect: check outbound access to the Arc endpoints and the system clock."
+        ],
+        "cleanup": [
+          "azcmagent disconnect, then delete the Arc machine resource."
+        ],
+        "repoPaths": [
+          "automation/avd/session-hosts-hybrid/scripts/Install-ArcAgent.ps1"
+        ]
+      }
+    },
+    {
+      "id": "a5b-cloud-device-extension",
+      "title": "The AVD Hybrid extension on an Arc machine",
+      "section": "4",
+      "mode": "live",
+      "minutes": 0.5,
+      "followAlong": {
+        "level": "full",
+        "goal": "Register an Arc-enabled Windows 11 machine as an AVD Hybrid session host.",
+        "needs": [
+          "A standard host pool created without VMs and with a managed identity",
+          "Reader for that identity on the Arc resource group",
+          "An Arc-enabled Windows 11 Enterprise VM joined to AD DS, Entra ID or both (hybrid); this demo joins AD DS",
+          "Az.DesktopVirtualization and Az.ConnectedMachine"
+        ],
+        "steps": [
+          {
+            "title": "Generate a registration token",
+            "instructions": "Create a short-lived token; keep it in memory only.",
+            "command": "$expires = (Get-Date).ToUniversalTime().AddHours(2).ToString('yyyy-MM-ddTHH:mm:ss.fffffffZ')\n$token = (New-AzWvdRegistrationInfo -ResourceGroupName <rg> -HostPoolName <pool> -ExpirationTime $expires).Token",
+            "check": "$token is populated."
+          },
+          {
+            "title": "Install the extension",
+            "instructions": "Install the AVD Hybrid extension on the Arc machine with the token as a protected setting.",
+            "command": "New-AzConnectedMachineExtension -Name 'Microsoft.AzureVirtualDesktop.CloudDeviceExtension' -ResourceGroupName <arc rg> -MachineName <machine> -Location <location> -Publisher 'Microsoft.AzureVirtualDesktop' -ExtensionType 'CloudDeviceExtension' -ProtectedSetting @{ registrationToken = $token }",
+            "check": "The extension shows Succeeded."
+          },
+          {
+            "title": "Wait for the host",
+            "instructions": "The host can take up to 15 minutes to become Available after the extension succeeds.",
+            "command": "Get-AzWvdSessionHost -ResourceGroupName <rg> -HostPoolName <pool> | Select-Object Name, Status",
+            "check": "The host shows Available."
+          }
+        ],
+        "troubleshooting": [
+          "Host stays Unavailable: confirm Reader for the pool's managed identity on the Arc resource group and outbound access to the AVD service URLs."
+        ],
+        "cleanup": [
+          "Remove the extension and the session host from the pool."
+        ],
+        "repoPaths": [
+          "automation/avd/session-hosts-hybrid/scripts/Register-HybridHosts.ps1"
+        ]
+      }
+    },
+    {
       "id": "a2b-identity-ticket",
       "title": "Identity: three paths, one proof",
-      "section": "2B",
+      "section": "5",
       "mode": "live+recorded",
       "minutes": 1,
       "followAlong": {
@@ -235,367 +751,6 @@
       }
     },
     {
-      "id": "a3a-azure-host-pool",
-      "title": "AVD on Azure: host pool and session hosts",
-      "section": "3",
-      "mode": "live",
-      "minutes": 0.33,
-      "followAlong": {
-        "level": "full",
-        "goal": "Create a pooled host pool, desktop application group and workspace.",
-        "needs": [
-          "Az.DesktopVirtualization",
-          "Microsoft.DesktopVirtualization provider registered",
-          "A resource group"
-        ],
-        "steps": [
-          {
-            "title": "Create the host pool",
-            "instructions": "Create a pooled, breadth-first host pool with a session limit.",
-            "command": "$hp = New-AzWvdHostPool -ResourceGroupName <rg> -Name hp-demo-azure -Location <location> -HostPoolType Pooled -LoadBalancerType BreadthFirst -PreferredAppGroupType Desktop -MaxSessionLimit 4",
-            "check": "Get-AzWvdHostPool returns hp-demo-azure."
-          },
-          {
-            "title": "Create the desktop application group",
-            "instructions": "Create a desktop application group for the pool.",
-            "command": "$ag = New-AzWvdApplicationGroup -ResourceGroupName <rg> -Name ag-demo-azure -Location <location> -HostPoolArmPath $hp.Id -ApplicationGroupType Desktop",
-            "check": "The application group lists the host pool."
-          },
-          {
-            "title": "Create the workspace and register the group",
-            "instructions": "Create the workspace and add the application group.",
-            "command": "New-AzWvdWorkspace -ResourceGroupName <rg> -Name ws-demo -Location <location> -ApplicationGroupReference $ag.Id",
-            "check": "The workspace lists the application group."
-          },
-          {
-            "title": "Entitle a user group",
-            "instructions": "Assign the Desktop Virtualization User role on the application group.",
-            "command": "New-AzRoleAssignment -ObjectId <group object id> -RoleDefinitionName 'Desktop Virtualization User' -Scope $ag.Id",
-            "check": "The users appear on the application group's assignments."
-          }
-        ],
-        "troubleshooting": [
-          "Provider not registered: Register-AzResourceProvider -ProviderNamespace Microsoft.DesktopVirtualization."
-        ],
-        "cleanup": [
-          "Remove the workspace, application group and host pool when finished."
-        ],
-        "repoPaths": [
-          "automation/avd/control-plane"
-        ]
-      }
-    },
-    {
-      "id": "a3b-image-builder",
-      "title": "One image artifact: Image Builder to gallery to host pool",
-      "section": "3",
-      "mode": "live+recorded",
-      "minutes": 0.5,
-      "followAlong": {
-        "level": "full",
-        "goal": "Build a Windows 11 multi-session image with Azure Image Builder into a Compute Gallery.",
-        "needs": [
-          "Compute Gallery with an image definition",
-          "Image Builder identity with the gallery roles",
-          "Microsoft.VirtualMachineImages provider registered"
-        ],
-        "steps": [
-          {
-            "title": "Resolve an exact source image version",
-            "instructions": "Pin an exact marketplace version for reproducibility (Image Builder also accepts latest, resolved at build time).",
-            "command": "./automation/avd/images/azure/scripts/Get-PlatformImageVersion.ps1 -Location <location> -Publisher MicrosoftWindowsDesktop -Offer office-365 -Sku win11-25h2-avd-m365",
-            "check": "An exact version number is returned."
-          },
-          {
-            "title": "Deploy the template",
-            "instructions": "Deploy the Image Builder template from the repo with your gallery and identity.",
-            "command": "az deployment group create -g <rg> --template-file automation/avd/images/azure/bicep/main.bicep --parameters <your parameter file>",
-            "check": "The template shows provisioning Succeeded."
-          },
-          {
-            "title": "Start the build",
-            "instructions": "Start the build; it takes 45 to 90 minutes.",
-            "command": "./automation/avd/images/azure/scripts/Start-ImageBuild.ps1 -SubscriptionId <sub> -ResourceGroupName <rg> -Execute",
-            "check": "Run state moves to Running, then Succeeded."
-          },
-          {
-            "title": "Confirm the gallery image version",
-            "instructions": "List the versions of the image definition.",
-            "command": "Get-AzGalleryImageVersion -ResourceGroupName <rg> -GalleryName <gallery> -GalleryImageDefinitionName <definition> | Select-Object Name, ProvisioningState",
-            "check": "A new version with ProvisioningState Succeeded."
-          }
-        ],
-        "troubleshooting": [
-          "Build fails at the customiser: open the staging resource group's customization log."
-        ],
-        "cleanup": [
-          "Delete the image template and old image versions to avoid storage cost."
-        ],
-        "repoPaths": [
-          "automation/avd/images/azure"
-        ]
-      }
-    },
-    {
-      "id": "a3c-avd-insights",
-      "title": "AVD Insights",
-      "section": "3",
-      "mode": "live",
-      "minutes": 0.75,
-      "followAlong": {
-        "level": "full",
-        "goal": "Enable AVD Insights for a host pool.",
-        "needs": [
-          "A Log Analytics workspace",
-          "Session hosts with Azure Monitor Agent"
-        ],
-        "steps": [
-          {
-            "title": "Open Insights and run the configuration workbook",
-            "instructions": "In the portal open Azure Virtual Desktop > Insights, select the subscription, and use Open configuration workbook.",
-            "command": "",
-            "check": "The configuration workbook reports diagnostics enabled for the host pool and workspace."
-          },
-          {
-            "title": "Associate the Insights data collection rule with the hosts",
-            "instructions": "Create the data collection rule from the workbook and associate it with the session hosts.",
-            "command": "",
-            "check": "Host performance counters and events appear after the first collection interval."
-          }
-        ],
-        "troubleshooting": [
-          "No data: allow time for the first collection; confirm the Azure Monitor Agent is installed."
-        ],
-        "cleanup": [
-          "Delete the data collection rule and association if it was a test."
-        ],
-        "repoPaths": [
-          "handouts/Deployment_Checklist.md"
-        ]
-      }
-    },
-    {
-      "id": "a3d-dcr-cost",
-      "title": "Data collection rules that keep costs sane",
-      "section": "3",
-      "mode": "live",
-      "minutes": 0.5,
-      "followAlong": {
-        "level": "full",
-        "goal": "Measure what your session hosts cost to monitor and keep only what you need.",
-        "needs": [
-          "A Log Analytics workspace with host data"
-        ],
-        "steps": [
-          {
-            "title": "Measure ingestion by table",
-            "instructions": "Run the query in your workspace.",
-            "command": "Usage | where TimeGenerated > ago(30d) | where IsBillable == true | summarize GB = sum(Quantity)/1000.0 by DataType | order by GB desc",
-            "check": "A ranked list of tables by billable GB."
-          },
-          {
-            "title": "Review the DCR data sources",
-            "instructions": "Open the data collection rule and review counters, sampling rates and event channels; remove what you do not use.",
-            "command": "",
-            "check": "Only the counters and channels that Insights and your alerts need remain."
-          }
-        ],
-        "troubleshooting": [],
-        "cleanup": [
-          "None."
-        ],
-        "repoPaths": [
-          "automation/landing-zones/avd"
-        ]
-      }
-    },
-    {
-      "id": "a4a-azure-local-host-pool",
-      "title": "AVD on Azure Local: host pool and a session host as an Azure Local VM",
-      "section": "4",
-      "mode": "live",
-      "minutes": 0.9,
-      "followAlong": {
-        "level": "read",
-        "goal": "Understand how an Azure Local VM becomes an AVD session host; the steps need an Azure Local cluster.",
-        "needs": [
-          "An Azure Local cluster with an Arc Resource Bridge and a custom location (not required to read)"
-        ],
-        "steps": [
-          {
-            "title": "Create the VM from Azure",
-            "instructions": "Create an Azure Local VM from a gallery image on a logical network, then register it to the host pool with a registration token passed in memory.",
-            "command": "az stack-hci-vm create --name <vm> --resource-group <rg> --custom-location <custom location id> --image <image name> --admin-username <admin> --admin-password <read from a secure prompt, never typed into a script> --nics <nic name> --storage-path-id <storage path id>",
-            "check": "The VM lists as Succeeded under Azure Local virtual machines."
-          },
-          {
-            "title": "Register to the host pool",
-            "instructions": "Run the registration step with a token generated at deploy time.",
-            "command": "./automation/avd/session-hosts-azure-local/scripts/Register-AvdSessionHostsAzureLocal.ps1 -SubscriptionId <sub> -ResourceGroupName <vm rg> -HostPoolResourceGroup <rg> -HostPoolName <pool> -TokenScriptPath ./automation/avd/control-plane/scripts/New-AvdRegistrationToken.ps1 -Execute",
-            "check": "The host appears Available in the pool."
-          }
-        ],
-        "troubleshooting": [
-          "Host Unavailable: check outbound access to the AVD service URLs from the logical network."
-        ],
-        "cleanup": [
-          "Delete the VM and remove the session host from the pool."
-        ],
-        "repoPaths": [
-          "automation/avd/session-hosts-azure-local"
-        ]
-      }
-    },
-    {
-      "id": "a4c-sizing-guides",
-      "title": "Sizing AVD on Azure Local: the two public guides and this lab's numbers",
-      "section": "4",
-      "mode": "live",
-      "minutes": 0.75,
-      "followAlong": {
-        "level": "full",
-        "goal": "Size an AVD solution on Azure Local bottom-up for your own users: session hosts and the SOFS that serves the FSLogix profiles.",
-        "needs": [
-          "A browser: https://azurelocal.cloud/azurelocal-avd/ and https://azurelocal.cloud/azurelocal-sofs-fslogix/architecture/capacity-planning/",
-          "Your user count, profile size per user type and growth estimate",
-          "Your cluster's node count, capacity drives per node and memory per node"
-        ],
-        "steps": [
-          {
-            "title": "Read the AVD on Azure Local architecture",
-            "instructions": "Open https://azurelocal.cloud/azurelocal-avd/ and read the Architecture and Deployment Scenarios pages: session hosts are Azure Local VMs on a logical network, managed from Azure. Pick the scenario closest to yours and size the session hosts from user density (vCPU and memory per user).",
-            "command": "",
-            "check": "You have a session-host count and size (vCPU, memory, OS disk) for your users."
-          },
-          {
-            "title": "Size the profile storage",
-            "instructions": "Open https://azurelocal.cloud/azurelocal-sofs-fslogix/architecture/capacity-planning/ and compare https://azurelocal.cloud/azurelocal-sofs-fslogix/architecture/scenarios/. Compute usable = users × profile size × (1 + growth); guest pool = usable × guest mirror copies; data disks per VM = pool ÷ SOFS VMs; host volume per VM = OS disk + data disks + overhead; raw = host volumes × host mirror copies. Worked example from the session (two hosts): 20 users × 30 GB + 20 % = 720 GB usable → 1.44 TB guest two-way pool → 2 VMs × 4 × 256 GB (one disk per VM kept as repair reserve) → two 1.5 TiB host volumes → 6 TiB raw. On two hosts use two SOFS VMs, one per host, with a cloud witness: a third VM would share a host and losing that host would take the guest quorum.",
-            "command": "",
-            "check": "You have usable, guest pool, data-disk, host-volume and raw figures for the profiles."
-          },
-          {
-            "title": "Check the fit on the cluster",
-            "instructions": "Add the session-host and other VM volumes to the profile volumes, keep one capacity drive per node unallocated as the repair reserve, and check that every VM can restart on the remaining nodes when one node is down (vCPU and memory).",
-            "command": "",
-            "check": "Allocated volumes fit inside usable capacity minus the reserve, and the VMs fit on N-1 nodes."
-          }
-        ],
-        "troubleshooting": [
-          "Raw-to-usable looks far worse than 4:1 at small scale: the fixed OS disks and the second mirror dominate small designs; compare the guide's small-shop scenario.",
-          "Does not fit on N-1 nodes: reduce density per host, add a node, or accept that some VMs stay down during a node outage, and write that down."
-        ],
-        "cleanup": [
-          "None: nothing is deployed."
-        ],
-        "repoPaths": [
-          "handouts/Platform_Comparison.md"
-        ]
-      }
-    },
-    {
-      "id": "a4b-gpu-evidence",
-      "title": "GPU on Azure Local: one L4 by DDA on a dedicated session host",
-      "section": "4",
-      "mode": "live+recorded",
-      "minutes": 0.5,
-      "followAlong": {
-        "level": "read",
-        "goal": "Understand GPU by DDA versus GPU partitioning on Azure Local, what the free driver gives (compute and AI) and what desktop graphics acceleration needs (NVIDIA vWS licensing).",
-        "needs": [],
-        "steps": [],
-        "troubleshooting": [],
-        "cleanup": [],
-        "repoPaths": [
-          "automation/azure-local/cluster-configure/gpu"
-        ]
-      }
-    },
-    {
-      "id": "a5a-hyperv-arc",
-      "title": "Plain Hyper-V VMs seen in Azure only as Arc machines",
-      "section": "5",
-      "mode": "live",
-      "minutes": 0.75,
-      "followAlong": {
-        "level": "full",
-        "goal": "Make an ordinary Windows VM on any hypervisor an Arc-enabled server.",
-        "needs": [
-          "A Windows 11 Enterprise VM (any hypervisor)",
-          "Rights to onboard Arc machines (Azure Connected Machine Onboarding on the resource group)",
-          "Outbound access to the Arc endpoints"
-        ],
-        "steps": [
-          {
-            "title": "Create the onboarding principal",
-            "instructions": "Create a service principal scoped only to the Arc resource group.",
-            "command": "$sp = New-AzADServicePrincipal -DisplayName spn-arc-onboard\nNew-AzRoleAssignment -ObjectId $sp.Id -RoleDefinitionName 'Azure Connected Machine Onboarding' -Scope /subscriptions/<sub>/resourceGroups/<arc rg>",
-            "check": "The role assignment exists on the Arc resource group."
-          },
-          {
-            "title": "Install and connect the Connected Machine agent in the guest",
-            "instructions": "In the guest, in an elevated session, download and run AzureConnectedMachineAgent.msi from the Microsoft download link in the Azure Arc documentation, then run the onboarding. Pass the secret in memory and never store it.",
-            "command": "azcmagent connect --service-principal-id <app id> --service-principal-secret <secret> --tenant-id <tenant> --subscription-id <sub> --resource-group <arc rg> --location <location> --resource-name <vm name>",
-            "check": "azcmagent show reports Connected."
-          }
-        ],
-        "troubleshooting": [
-          "Agent cannot connect: check outbound access to the Arc endpoints and the system clock."
-        ],
-        "cleanup": [
-          "azcmagent disconnect, then delete the Arc machine resource."
-        ],
-        "repoPaths": [
-          "automation/avd/session-hosts-hybrid/scripts/Install-ArcAgent.ps1"
-        ]
-      }
-    },
-    {
-      "id": "a5b-cloud-device-extension",
-      "title": "The AVD Hybrid extension on an Arc machine",
-      "section": "5",
-      "mode": "live",
-      "minutes": 0.5,
-      "followAlong": {
-        "level": "full",
-        "goal": "Register an Arc-enabled Windows 11 machine as an AVD Hybrid session host.",
-        "needs": [
-          "A standard host pool created without VMs and with a managed identity",
-          "Reader for that identity on the Arc resource group",
-          "An Arc-enabled, Entra-joined Windows 11 Enterprise VM",
-          "Az.DesktopVirtualization and Az.ConnectedMachine"
-        ],
-        "steps": [
-          {
-            "title": "Generate a registration token",
-            "instructions": "Create a short-lived token; keep it in memory only.",
-            "command": "$expires = (Get-Date).ToUniversalTime().AddHours(2).ToString('yyyy-MM-ddTHH:mm:ss.fffffffZ')\n$token = (New-AzWvdRegistrationInfo -ResourceGroupName <rg> -HostPoolName <pool> -ExpirationTime $expires).Token",
-            "check": "$token is populated."
-          },
-          {
-            "title": "Install the extension",
-            "instructions": "Install the AVD Hybrid extension on the Arc machine with the token as a protected setting.",
-            "command": "New-AzConnectedMachineExtension -Name 'Microsoft.AzureVirtualDesktop.CloudDeviceExtension' -ResourceGroupName <arc rg> -MachineName <machine> -Location <location> -Publisher 'Microsoft.AzureVirtualDesktop' -ExtensionType 'CloudDeviceExtension' -ProtectedSetting @{ registrationToken = $token }",
-            "check": "The extension shows Succeeded."
-          },
-          {
-            "title": "Wait for the host",
-            "instructions": "The host can take up to 15 minutes to become Available after the extension succeeds.",
-            "command": "Get-AzWvdSessionHost -ResourceGroupName <rg> -HostPoolName <pool> | Select-Object Name, Status",
-            "check": "The host shows Available."
-          }
-        ],
-        "troubleshooting": [
-          "Host stays Unavailable: confirm Reader for the pool's managed identity on the Arc resource group and outbound access to the AVD service URLs."
-        ],
-        "cleanup": [
-          "Remove the extension and the session host from the pool."
-        ],
-        "repoPaths": [
-          "automation/avd/session-hosts-hybrid/scripts/Register-HybridHosts.ps1"
-        ]
-      }
-    },
-    {
       "id": "a6-profiles",
       "title": "The profile share, per-user containers and the settings that make them portable",
       "section": "6",
@@ -645,7 +800,7 @@
       "title": "One repo, one config, three terminals",
       "section": "7",
       "mode": "live",
-      "minutes": 1,
+      "minutes": 0.5,
       "followAlong": {
         "level": "full",
         "goal": "Preview a change to the AVD control plane without applying it.",
@@ -669,6 +824,52 @@
         ],
         "repoPaths": [
           "automation/avd/control-plane"
+        ]
+      }
+    },
+    {
+      "id": "a7b-security-walk",
+      "title": "Security across the three terminals: one portal walk",
+      "section": "7",
+      "mode": "live",
+      "minutes": 1,
+      "followAlong": {
+        "level": "full",
+        "goal": "Check the same security controls on your own AVD environment.",
+        "needs": [
+          "An AVD host pool with session hosts (Azure VMs and/or Arc-enabled machines)",
+          "Microsoft Defender for Cloud with Defender for Servers and Defender for Storage on the subscriptions",
+          "A Log Analytics workspace with Microsoft Sentinel and Windows security events collected by the Azure Monitor Agent"
+        ],
+        "steps": [
+          {
+            "title": "Host pool: device redirection",
+            "instructions": "Azure Virtual Desktop > Host pools > your pool > RDP Properties > Device redirection: turn off what you do not need (drives, printers, cameras, smart cards).",
+            "command": "Get-AzWvdHostPool -ResourceGroupName <rg> -Name <host pool> | Select-Object Name, CustomRdpProperty",
+            "check": "CustomRdpProperty contains drivestoredirect:s:; redirectprinters:i:0; camerastoredirect:s:"
+          },
+          {
+            "title": "Defender for Cloud: plans and inventory",
+            "instructions": "Defender for Cloud > Environment settings > your subscription: Servers Plan 2 and Storage On. Then Inventory, search for your hosts.",
+            "command": "Get-AzSecurityPricing | Where-Object PricingTier -eq Standard | Select-Object Name, SubPlan",
+            "check": "VirtualMachines Standard P2 and StorageAccounts Standard DefenderForStorageV2; every session host is listed in Inventory."
+          },
+          {
+            "title": "Sentinel: security events per host",
+            "instructions": "Log Analytics workspace > Logs: run the step 4 query with your host name prefix.",
+            "command": "SecurityEvent | where TimeGenerated > ago(1h) | where Computer has \"<host prefix>\" | summarize count() by Computer",
+            "check": "One row per session host."
+          }
+        ],
+        "troubleshooting": [
+          "A host missing from SecurityEvent: check that it is associated with the Windows security events data collection rule and that the Azure Monitor Agent extension succeeded.",
+          "An Arc machine without MDE.Windows: Defender for Servers onboards Defender for Endpoint on supported server and multi-session operating systems; onboard single-session Windows client machines with Intune or the Defender for Endpoint onboarding package."
+        ],
+        "cleanup": [
+          "Nothing to clean up (read-only)."
+        ],
+        "repoPaths": [
+          "automation/shared/security"
         ]
       }
     },
@@ -852,7 +1053,7 @@
           {
             "title": "Run a heartbeat query",
             "instructions": "Show the last heartbeat per host.",
-            "command": "Heartbeat | where TimeGenerated > ago(1h) | summarize last = max(TimeGenerated) by Computer | order by Computer asc",
+            "command": "Heartbeat | where TimeGenerated > ago(1h) | summarize LastHeartbeat = max(TimeGenerated) by Computer | order by Computer asc",
             "check": "Every host you expect, with a recent last heartbeat."
           }
         ],

@@ -5,7 +5,7 @@
     Live demo a3f (owner, 14 Oct): publishes applications with RemoteApp, the same objects the portal's "Create an application
     group" wizard creates (type RemoteApp), on an existing pool. -Remove deletes them again.
 .DESCRIPTION
-    Inputs (G5, nothing lab-specific in this file): environment/avd/environment.yml
+    Inputs (G5, nothing environment-specific in this file): environment/avd/environment.yml
       subscription_id_avd, entra_groups, group_object_ids, host_pools.<key>.preferred_app_group_type,
       remote_apps { host_pool_key, host_pool_name, resource_group, app_group_name, friendly_name, assign_group, workspace_name,
       prefer_remote_app, apps[] { name, start_menu_item, friendly_name }, tags }

@@ -7,7 +7,7 @@
     Order: backup items (vault must be empty) -> hub-side peering (connectivity subscription) -> Azure Local-side
     peering -> the seven resource groups (hosts, arc, mon, img, stor, net, control; zone links are children of the
     zone and go with rg-*-net) -> subscription-scope objects (policy assignments, budget, custom roles, sub-scope role
-    assignment). Filter: every item must carry the lab token in its name or sit in a lab resource group; shared hub,
+    assignment). Filter: every item must carry the naming token in its name or sit in an environment resource group; shared hub,
     VPN, DCs, Bastion and the Azure Local landing zone are never touched. With -Tool Terraform the plan is
     `terraform plan -destroy` and -Execute applies it. Session-host, control-plane and image solutions must be torn
     down first (they live inside these resource groups).
@@ -33,7 +33,7 @@ if (-not $Execute) { $WhatIfPreference = $true }
 $inputs = Get-LzAvdInputs -InputFile $InputFile
 $names = $inputs.names
 $sub = $inputs.subscription_id_avd
-$token = $inputs.lab_token
+$token = $inputs.naming_token
 
 $hubSegments = $inputs.hub_vnet_id -split '/'
 $azlSegments = $inputs.azl_spoke_vnet_id -split '/'
@@ -59,14 +59,14 @@ Add-LzAvdPlanItem -Order 41 -Kind 'budget' -Id "/subscriptions/$sub/providers/Mi
 Add-LzAvdPlanItem -Order 42 -Kind 'roleDefinition' -Id "/subscriptions/$sub/providers/Microsoft.Authorization/roleDefinitions/$($names.role_aib_image)" -Note 'custom role (looked up by its name, the last segment)'
 Add-LzAvdPlanItem -Order 42 -Kind 'roleDefinition' -Id "/subscriptions/$sub/providers/Microsoft.Authorization/roleDefinitions/$($names.role_aib_network)" -Note 'custom role (looked up by its name, the last segment)'
 
-# Safety filter: only lab objects (token in the name) or objects inside this subscription's lab RGs.
+# Safety filter: only environment objects (token in the name) or objects inside this subscription's environment RGs.
 $filtered = @($plan | Where-Object {
         $isCrossSub = $_.Kind -eq 'peering'
-        $inLabSub = Test-LzAvdResourceInSubscription -ResourceId $_.Id -SubscriptionId $sub
-        ($_.Id -match [regex]::Escape($token)) -and ($inLabSub -or $isCrossSub)
+        $inEnvironmentSub = Test-LzAvdResourceInSubscription -ResourceId $_.Id -SubscriptionId $sub
+        ($_.Id -match [regex]::Escape($token)) -and ($inEnvironmentSub -or $isCrossSub)
     } | Sort-Object Order)
 $dropped = @($plan | Where-Object { $filtered -notcontains $_ })
-if ($dropped.Count -gt 0) { Write-LzAvdLog -Level Warning -Message "Dropped $($dropped.Count) item(s) that failed the lab-token/subscription filter." }
+if ($dropped.Count -gt 0) { Write-LzAvdLog -Level Warning -Message "Dropped $($dropped.Count) item(s) that failed the naming-token/subscription filter." }
 
 $filtered | Format-Table Order, Kind, Id -AutoSize | Out-String | ForEach-Object { Write-LzAvdLog -Message $_ }
 if ($OutputPlan) {

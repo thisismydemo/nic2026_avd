@@ -5,7 +5,7 @@
 targetScope = 'resourceGroup'
 
 param org string
-param lab_token string
+param naming_token string
 param location string
 param location_short string
 param tenant_id string

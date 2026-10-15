@@ -114,7 +114,7 @@ function Get-LzAvdInputs {
     )
     if (-not (Test-Path -Path $InputFile)) { throw "Input file '$InputFile' not found. Run ConvertTo-NIC26TfVars -Solution lz-avd first." }
     $inputs = Get-Content -Path $InputFile -Raw | ConvertFrom-Json -AsHashtable
-    foreach ($required in 'names', 'subscription_id_avd', 'location', 'lab_token') {
+    foreach ($required in 'names', 'subscription_id_avd', 'location', 'naming_token') {
         if (-not $inputs.ContainsKey($required)) { throw "Input file '$InputFile' lacks required key '$required'." }
     }
     return $inputs
@@ -224,7 +224,7 @@ function Assert-LzAvdWindowsHost {
     [CmdletBinding()]
     param()
     if (-not $IsWindows) {
-        throw 'This script handles secret values and must run on the Windows lab jump server (keyvault-and-secrets.md K-8).'
+        throw 'This script handles secret values and must run on the Windows jump server (keyvault-and-secrets.md K-8).'
     }
     if (Get-Variable -Name Transcript -Scope Global -ErrorAction SilentlyContinue) {
         throw 'A transcript appears to be active; Start-Transcript is forbidden around secret handling (contract section 3).'

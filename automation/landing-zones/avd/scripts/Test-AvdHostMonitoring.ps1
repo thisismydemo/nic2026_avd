@@ -2,7 +2,7 @@
 <#
 .SYNOPSIS
     READ-ONLY check of the AVD monitoring per session host (T-6.2.4): for every session host in the three host pools,
-    the Azure Monitor Agent extension, the association with the AVD Insights DCR and fresh data in the lab workspace
+    the Azure Monitor Agent extension, the association with the AVD Insights DCR and fresh data in the Log Analytics workspace
     (Heartbeat and WVDAgentHealthStatus). Azure VMs, Azure Local VMs (Arc) and Hybrid hosts (Arc) are all covered.
 .DESCRIPTION
     Session hosts come from the host pools (Get session hosts API, resourceId of each host). The AMA extension is read
@@ -35,7 +35,7 @@ if (-not $ctx -or $ctx.Tenant.Id -ne [string]$config.values['tenant_id']) { [voi
 
 function Get-Json { param([string]$Path) $r = Invoke-AzRestMethod -Path $Path -Method GET; if ($r.StatusCode -ge 400) { return $null }; return ($r.Content | ConvertFrom-Json -Depth 50) }
 
-# Fresh data per computer in the lab workspace (Heartbeat from AMA; WVDAgentHealthStatus from the host-pool diagnostics).
+# Fresh data per computer in the Log Analytics workspace (Heartbeat from AMA; WVDAgentHealthStatus from the host-pool diagnostics).
 $law = Get-Json -Path "$($lawId)?api-version=2023-09-01"
 $token = (Get-AzAccessToken -ResourceUrl 'https://api.loganalytics.io' -AsSecureString).Token
 function Invoke-LawQuery {

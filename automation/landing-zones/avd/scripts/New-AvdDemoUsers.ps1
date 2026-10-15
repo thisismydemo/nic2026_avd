@@ -9,9 +9,9 @@
     <SecretNamePrefix>-avd-demo-user-<name>-username / -password (90-day expiry, five tags). It is never printed,
     logged, returned or written to disk. Existing users are left untouched unless -ResetPassword is given.
 .EXAMPLE
-    .\New-AvdDemoUsers.ps1 -TenantId <id> -Users user1,user2 -LabToken <lab> -UsersGroupName <union-users-group> -Domain contoso.com -KeyVaultName <ops-key-vault> -SecretNamePrefix <org>-<lab>
+    .\New-AvdDemoUsers.ps1 -TenantId <id> -Users user1,user2 -NamingToken <token> -UsersGroupName <union-users-group> -Domain contoso.com -KeyVaultName <ops-key-vault> -SecretNamePrefix <org>-<token>
 .EXAMPLE
-    .\New-AvdDemoUsers.ps1 -TenantId <id> -Users user1,user2 -LabToken <lab> -UsersGroupName <union-users-group> -Domain contoso.com -KeyVaultName <ops-key-vault> -SecretNamePrefix <org>-<lab> -OwnerEmail owner@contoso.com -Execute
+    .\New-AvdDemoUsers.ps1 -TenantId <id> -Users user1,user2 -NamingToken <token> -UsersGroupName <union-users-group> -Domain contoso.com -KeyVaultName <ops-key-vault> -SecretNamePrefix <org>-<token> -OwnerEmail owner@contoso.com -Execute
 #>
 [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
 param(
@@ -22,7 +22,7 @@ param(
     [Parameter(Mandatory)][string[]]$Users,
     [string]$UsageLocation = 'US',
     [string]$OwnerEmail,
-    [Parameter(Mandatory)][string]$LabToken,
+    [Parameter(Mandatory)][string]$NamingToken,
     [string]$UsersGroupName,
     [int]$SecretExpiryDays = 90,
     [switch]$ResetPassword,
@@ -51,7 +51,7 @@ if ($UsersGroupName) {
     if (-not $unionGroup) { throw "Group '$UsersGroupName' not found; create it with New-AvdEntraGroups.ps1 first." }
     $unionMemberIds = @(Get-MgGroupMember -GroupId $unionGroup.Id -All | Select-Object -ExpandProperty Id)
 }
-$tags = @{ owner = $OwnerEmail; project = $LabToken; 'rotation-days' = "$SecretExpiryDays"; 'managed-by' = 'script'; lifecycle = 'temporary' }
+$tags = @{ owner = $OwnerEmail; project = $NamingToken; 'rotation-days' = "$SecretExpiryDays"; 'managed-by' = 'script'; lifecycle = 'temporary' }
 $expires = (Get-Date).ToUniversalTime().AddDays($SecretExpiryDays)
 
 $summary = foreach ($name in $Users) {

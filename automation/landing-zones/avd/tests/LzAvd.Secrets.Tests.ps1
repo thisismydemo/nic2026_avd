@@ -3,7 +3,7 @@
     Pester 5 - secrets / identifiers sweep for lz-avd (automation/CONTRACT.md section 8, "Secrets" gate).
     Zero GUIDs (other than all-zero placeholders and bicep/modules/builtin-ids.bicep), no private-tenant identifiers
     (contract section 7; the forbidden words are assembled at run time so this file does not carry them),
-    no credential literals, no non-documentation public IPs. Private RFC1918 lab ranges are allowed only in the
+    no credential literals, no non-documentation public IPs. Private RFC1918 ranges are allowed only in the
     two example files (they are the design's IIC example addresses).
 #>
 BeforeAll {
@@ -32,7 +32,7 @@ Describe 'identifier and secret sweep' {
         $hits | Should -BeNullOrEmpty
     }
 
-    It 'contains no IP address outside the example files; example files use only private lab ranges' {
+    It 'contains no IP address outside the example files; example files use only private ranges' {
         $ipPattern = '\b(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\b'
         $hits = foreach ($f in $script:files) {
             $matches = Select-String -Path $f.FullName -Pattern $ipPattern -AllMatches

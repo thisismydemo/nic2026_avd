@@ -1,4 +1,4 @@
-# Reference template, not run in the lab. Windows 11 Enterprise single-session image for AVD Hybrid hosts on Nutanix AHV.
+# Reference template, not run end to end. Windows 11 Enterprise single-session image for AVD Hybrid hosts on Nutanix AHV.
 packer {
   required_version = ">= 1.11.0"
 

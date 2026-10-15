@@ -3,9 +3,9 @@
 <#
 .SYNOPSIS
     Deploys the Azure Monitor workbook "AVD Anywhere (middle dot) three terminals" (owner, 14 Oct): the three host pools
-    side by side over the lab Log Analytics workspace. Default is a plan (ARM what-if); -Execute deploys and reads back; -Remove deletes.
+    side by side over the Log Analytics workspace. Default is a plan (ARM what-if); -Execute deploys and reads back; -Remove deletes.
 .DESCRIPTION
-    Inputs (G5, nothing lab-specific in this file): environment/avd (+ shared) through Get-NIC26Config and the
+    Inputs (G5, nothing environment-specific in this file): environment/avd (+ shared) through Get-NIC26Config and the
     avd-control-plane names catalog:
       tenant_id, subscription_id_avd, log_analytics_workspace_id, host_pools.<realm>.friendly_name,
       computer_name_prefixes.<realm>, names.rg_control, names.hostpool_<realm>, tags

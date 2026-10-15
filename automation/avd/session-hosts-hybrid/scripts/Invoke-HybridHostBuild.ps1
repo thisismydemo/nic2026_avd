@@ -16,7 +16,7 @@ For each VM in hybrid.vms (or -VmName):
      account, then restart and wait.
   3. Azure Arc: when the Arc machine is not Connected, installs the Connected Machine agent in the guest and connects
      it to hybrid.arc_resource_group with a short-lived access token of the operator (no onboarding service principal
-     secret exists in this lab; Learn: azcmagent connect --access-token), then merges and reads back the tags.
+     secret exists in this environment; Learn: azcmagent connect --access-token), then merges and reads back the tags.
   4. Registration: Register-HybridHosts.ps1 (CloudDeviceExtension, token only in protected settings, K-7) for hosts
      that are not yet in the host pool.
 Secrets are resolved in memory and passed only as PSCredential/SecureString arguments; none is written to a file

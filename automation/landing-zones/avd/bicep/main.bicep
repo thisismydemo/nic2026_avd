@@ -14,8 +14,8 @@ import { builtInRoles } from 'modules/builtin-ids.bicep'
 @description('Organization token in every name (D-006).')
 param org string
 
-@description('Lab token in every name (D-005).')
-param lab_token string
+@description('Naming token in every name (D-005).')
+param naming_token string
 
 @description('Azure region for every regional resource (D-010).')
 param location string
@@ -71,7 +71,7 @@ param azl_spoke_vnet_id string
 @description('Azure Local spoke prefix.')
 param azl_spoke_prefix string
 
-@description('Lab Log Analytics workspace id (lz-azure-local output).')
+@description('Log Analytics workspace id (lz-azure-local output).')
 param log_analytics_workspace_id string
 
 @description('Operations Key Vault id (lz-azure-local output). Not read by IaC; echoed for validation only.')
@@ -95,7 +95,7 @@ param enable_dns_private_resolver bool
 @description('Static inbound endpoint IP inside the dnsin subnet (required when the resolver is enabled).')
 param dns_resolver_inbound_ip string = ''
 
-@description('Existing privatelink.file zone id to reuse; empty creates the lab zone (P-11).')
+@description('Existing privatelink.file zone id to reuse; empty creates its own zone (P-11).')
 param privatelink_file_zone_id string = ''
 
 @description('Also link the zone to the hub VNet.')
@@ -125,7 +125,7 @@ param enable_policy_assignments bool = true
 @description('Platform-owned hub peering and policy assignments require explicit ownership approval. False uses existing platform delivery.')
 param deploy_platform_scope_items bool = false
 
-@description('Object ids keyed avd_users, avd_admins, lab_operators.')
+@description('Object ids keyed avd_users, avd_admins, platform_operators.')
 param group_object_ids object
 
 @description('Object id of the Arc onboarding service principal; empty skips its role assignment.')
@@ -338,7 +338,7 @@ module images 'modules/images.bicep' = {
     tags: tags
     names: names
     image_definitions: image_definitions
-    lab_operators_object_id: group_object_ids.lab_operators
+    platform_operators_object_id: group_object_ids.platform_operators
   }
 }
 

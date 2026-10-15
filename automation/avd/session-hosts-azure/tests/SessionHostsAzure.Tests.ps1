@@ -32,8 +32,8 @@ Describe 'Session-host infrastructure' {
         $tf = Get-Content $tfPath -Raw
         $tfVars = Get-Content $tfVarsPath -Raw
         foreach ($text in @($bicep, $tf, $tfVars)) {
-            $text | Should -Not -Match '(?i)param\s+\w*(registration|(?<!lab_)token)'
-            $text | Should -Not -Match '(?i)variable\s+"?\w*(registration|(?<!lab_)token)'
+            $text | Should -Not -Match '(?i)param\s+\w*(registration|(?<!naming_)token)'
+            $text | Should -Not -Match '(?i)variable\s+"?\w*(registration|(?<!naming_)token)'
         }
         foreach ($text in @($bicep, $tf)) {
             $text | Should -Not -Match '(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
