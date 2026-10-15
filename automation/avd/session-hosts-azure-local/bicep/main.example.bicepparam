@@ -23,8 +23,10 @@ param memory_mb = 16384
 param custom_location_id = '/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/example-rg/providers/Microsoft.ExtendedLocation/customLocations/example-cl'
 param logical_network_id = '/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/example-rg/providers/Microsoft.AzureStackHCI/logicalNetworks/example-network'
 param image_id = '/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/example-rg/providers/Microsoft.AzureStackHCI/marketplaceGalleryImages/example-image'
+param storage_path_ids = [
+  '/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/example-rg/providers/Microsoft.AzureStackHCI/storageContainers/example-storage-path'
+]
 param dcr_id = '/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/example-rg/providers/Microsoft.Insights/dataCollectionRules/example-dcr'
-param entra_join_extension = true
 param enable_monitoring = true
 param hostpool_name = 'example-hostpool'
 param hostpool_rg = 'example-control-rg'

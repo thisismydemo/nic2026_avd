@@ -1,6 +1,6 @@
 # lz-avd — AVD landing zone
 
-Implements design/avd/landing-zone.md (AVD-LZ-01..14) under the rules of automation/CONTRACT.md. It is the foundation the AVD solutions (`avd-control-plane`, `avd-fslogix`, `avd-images`, `session-hosts-*`) build on. Nothing here deploys by itself: every script is `-WhatIf` by default and changes Azure only with `-Execute`.
+Implements design/avd/landing-zone.md (AVD-LZ-01..14) under the rules of the automation contract. It is the foundation the AVD solutions (`avd-control-plane`, `avd-fslogix`, `avd-images`, `session-hosts-*`) build on. Nothing here deploys by itself: every script is `-WhatIf` by default and changes Azure only with `-Execute`.
 
 ## Ownership before deployment
 

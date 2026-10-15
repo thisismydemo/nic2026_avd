@@ -30,7 +30,7 @@ inputs:
 
   # --- identity and monitoring (design §5.3, §9.2) ---
   - { name: group_object_ids,     type: map,    description: "Object ids of the AVD groups (schema keys avd_azure, avd_azl, avd_hybrid, ...); the three realm groups get Desktop Virtualization User on their application group.", required: true, source: environment }
-  - { name: avd_service_principal_object_id, type: string, description: "Object id of the Azure Virtual Desktop first-party service principal in this tenant (Get-AzADServicePrincipal -DisplayName 'Azure Virtual Desktop'); grants Desktop Virtualization Power On Off Contributor at subscription scope for the scaling plan and Start VM on Connect. Empty skips the assignment (design §5.3 says verify it is not already assigned higher up). ADDED; not yet in the schema.", required: false, default: "", source: environment }
+  - { name: avd_service_principal_object_id, type: string, description: "Object id of the Azure Virtual Desktop first-party service principal in this tenant (Get-AzADServicePrincipal -DisplayName 'Azure Virtual Desktop'); grants Desktop Virtualization Power On Off Contributor at subscription scope for the scaling plan and Start VM on Connect. Empty skips the assignment (design §5.3 says verify it is not already assigned higher up).", required: false, default: "", source: environment }
   - { name: log_analytics_workspace_id, type: string, description: "Lab workspace law-* (lz-azure-local output) for the AVD diagnostic settings (AVD-LZ-12); empty skips diagnostics.", required: true, source: environment }
 
 outputs:

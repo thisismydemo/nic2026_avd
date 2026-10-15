@@ -40,6 +40,12 @@ ConvertTo-NIC26TfVars     -Solution <solution folder or name> -Config $cfg -Exec
 # then the solution's own README: what-if or plan, review, deploy with -Execute, run its tests
 ```
 
+Three things to know about the loop:
+
+- **Wrapper-deployed solutions.** `avd/images/azure`, `avd/session-hosts-azure`, `avd/session-hosts-azure-local` and `avd/session-hosts-hybrid` take outputs of earlier stages (identity ids, the data collection rule, the host pool) and secure values (admin and domain-join credentials) that no environment file holds. The generated parameter file is therefore not complete for them. Deploy them through their wrapper script, which supplies those values in memory; `bicep/main.example.bicepparam` in each folder shows the full shape.
+- **Tuning inputs.** Optional inputs that are not keys of the environment schema (for example the VDOT and Teams switches, `defender_paths`, `enable_scaling_plan`) keep the default in the solution's `solution.yml`; change them there. Everything an environment file can set is in `shared/schemas`.
+- **Entry points outside the loop.** `avd/images/packer-nutanix` and `avd/images/packer-vsphere` are Packer templates with their own README and variables file; they have no `solution.yml`.
+
 ## Your configuration
 
 Copy the files in `shared/examples/` to `environment/shared/environment.yml` and `environment/avd/environment.yml` and replace every value (tenant, subscriptions, address plan, names). Secret values never go in a file: fields that need one hold `keyvault://<vault>/<secret>` references that are resolved in memory. The naming defaults (organisation, token, region) come from `shared/powershell/NIC26.Automation/NamingDefaults.psd1`, the `NIC26_ORG`, `NIC26_TOKEN` and `NIC26_REGION` variables, or your environment file; set your own. `landing-zones/avd/README.md` has the full configuration reference.
