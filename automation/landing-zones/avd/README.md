@@ -36,9 +36,9 @@ Outputs consumed downstream: resource group names, subnet ids, `dns_resolver_inb
 
 Nothing environment-specific is written in the code. Every name, region, address range, identity and size comes from one of three places, and the same values drive the Bicep and the Terraform track:
 
-1. **Your environment config** (`environment/shared/*.yml` and `environment/avd/*.yml`, validated by the schemas in `automation/shared/schemas`). Start from the `main.example.bicepparam` and `terraform.example.tfvars.json` files next to the code: they use the placeholder organisation `iic`, the naming token `nic26`, all-zero GUIDs and the `contoso.com` domain. Replace them with your own values.
+1. **Your environment config** (`environment/shared/*.yml` and `environment/avd/*.yml`, validated by the schemas in `automation/shared/schemas`). Set the values there (start from `automation/shared/examples/environment.avd.example.yml`) and generate the parameter files from it with `ConvertTo-NIC26BicepParam -Solution lz-avd -Config (Get-NIC26Config -Scope avd) -Execute` and `ConvertTo-NIC26TfVars`. The `main.example.bicepparam` and `terraform.example.tfvars.json` files next to the code only show the shape (placeholder organisation `iic`, naming token `nic26`, all-zero GUIDs, `contoso.com`); do not edit them for a deployment.
 2. **The name catalog** (the `names:` section of `solution.yml`). Resource names are generated from `org`, `naming_token` and `location_short` by the shared naming module, never typed in code. Peering names are derived from the VNet names in the catalog.
-3. **Script parameters.** The Entra and clean-up scripts take `-Org`, `-NamingToken`, `-Users`, `-Domain`, `-KeyVaultName` and `-SecretNamePrefix` as mandatory parameters; there are no built-in defaults to forget to change.
+3. **Script parameters.** The Entra scripts (`New-AvdEntraGroups.ps1`, `New-AvdDemoUsers.ps1`, `New-AvdConditionalAccess.ps1`, `Set-AvdEntraSso.ps1`, `Set-AvdStorageEntraKerberos.ps1`) read every value they need from the environment file: `tenant_id`, `org`, `token`, `demo_user_domain`, `demo_user_usage_location`, `demo_users`, `key_vault_id`, `secret_name_prefix`, `owner_email`, `ca_policy_name` and the names catalog. A parameter you pass (`-TenantId`, `-Org`, `-NamingToken`, `-Users`, `-Domain`, `-KeyVaultName`, `-SecretNamePrefix`, `-UsageLocation`) overrides the file; the scripts hold no built-in defaults.
 
 | Variable | Type | Required | Default | Where to set it | What it does |
 |---|---|---|---|---|---|
@@ -135,7 +135,7 @@ $cfg = Get-NIC26Config -Scope avd
 ConvertTo-NIC26BicepParam -Solution lz-avd -Config $cfg -Execute
 ConvertTo-NIC26TfVars     -Solution lz-avd -Config $cfg -Execute
 .\scripts\Invoke-LzAvdDeploy.ps1 -Tool Bicep            # Prereqs, Generate, Validate, Preview (what-if)
-.\scripts\Invoke-LzAvdDeploy.ps1 -Tool Terraform -BackendConfig ..\..\..\environment\avd\backend.lz-avd.hcl
+.\scripts\Invoke-LzAvdDeploy.ps1 -Tool Terraform   # state location from terraform_backend in the environment file; -BackendConfig <file> overrides it
 
 # 2. deploy (owner approval; still prompts, -Confirm:$false to skip)
 .\scripts\Invoke-LzAvdDeploy.ps1 -Tool Bicep -Stage Deploy -Execute

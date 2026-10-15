@@ -13,7 +13,7 @@
     the workspace id and the terminal map). Each realm becomes one terminal: "<friendly_name> (middle dot) <realm label>", e.g.
     "Terminal B (middle dot) Azure Local"; the host pool name and the computer-name prefix decide which rows belong to it.
     The workbook lands in the control-plane resource group (AVD subscription), kind shared, with a deterministic name, so
-    a re-run updates it in place. Tags: the control-plane tags (project=nic26) plus workload, managed-by and purpose.
+    a re-run updates it in place. Tags: the control-plane tags (the environment project tag) plus workload, managed-by and purpose.
     Steps, printed as they run:
       1. What-if (plan) or deployment of the module (-Execute).
       2. Read-back: the workbook resource, its tags, and the portal path.
@@ -49,6 +49,7 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..\..')).Path
 Import-Module (Join-Path $repoRoot 'automation\shared\powershell\NIC26.Automation\NIC26.Automation.psd1') -Force
 $config = Get-NIC26Config -Scope avd
 $v = $config.values
+$nc = Get-NIC26NamingContext -Config $config
 $cp = ConvertTo-NIC26TfVars -Solution (Join-Path $repoRoot 'automation\avd\control-plane') -Config $config | ConvertFrom-Json -Depth 50
 $sub = [string]$v['subscription_id_avd']
 $lawId = [string]$v['log_analytics_workspace_id']
@@ -71,12 +72,12 @@ $terminals = foreach ($realm in $v['host_pools'].Keys) {
     [ordered]@{ pool = $pool; prefix = $prefix; label = $label }
 }
 $tags = @{}; foreach ($p in $cp.tags.PSObject.Properties) { $tags[$p.Name] = [string]$p.Value }
-$tags['project'] = 'nic26'; $tags['workload'] = 'avd'; $tags['managed-by'] = 'bicep'; $tags['purpose'] = 'monitoring-workbook'
+if ($nc.Project) { $tags['project'] = $nc.Project }; $tags['workload'] = 'avd'; $tags['managed-by'] = 'bicep'; $tags['purpose'] = 'monitoring-workbook'
 
 $template = Join-Path $PSScriptRoot '..\bicep\modules\workbook-avd-anywhere.bicep'
 $deployment = @{
     ResourceGroupName       = $rg
-    Name                    = 'dep-iic-nic26-avd-workbook-01'
+    Name                    = New-NIC26ResourceName -Type dep -Purpose 'avd-workbook' -Org $nc.Org -Token $nc.Token
     TemplateFile            = $template
     TemplateParameterObject = @{ tags = $tags; display_name = $DisplayName; log_analytics_workspace_id = $lawId; terminals = @($terminals) }
 }
@@ -115,8 +116,8 @@ $id = [string]$r.Outputs['workbook_id'].Value
 
 Step '2. Read-back.'
 $res = Get-AzResource -ResourceId $id -ExpandProperties
-# project=nic26 is in the template; the merge keeps it on resources tagged by hand later as well.
-if ($res.Tags['project'] -ne 'nic26') { [void](Update-AzTag -ResourceId $id -Tag @{ project = 'nic26' } -Operation Merge -WhatIf:$false) }
+# The project tag is in the template; the merge keeps it on resources tagged by hand later as well.
+if ($nc.Project -and $res.Tags['project'] -ne $nc.Project) { [void](Update-AzTag -ResourceId $id -Tag @{ project = $nc.Project } -Operation Merge -WhatIf:$false) }
 $row = [pscustomobject]@{
     workbook    = $res.Properties.displayName
     id          = $id
@@ -127,5 +128,5 @@ $row = [pscustomobject]@{
     path        = "Resource group $rg > $DisplayName > Open Workbook; or Log Analytics workspace $(($lawId -split '/')[-1]) > Workbooks"
 }
 $row | Format-List | Out-String -Width 220 | Write-Information -InformationAction Continue
-if ($row.source -ne ($lawId -split '/')[-1] -or $row.project_tag -ne 'nic26') { throw 'Read-back failed: source or project tag is not as deployed.' }
+if ($row.source -ne ($lawId -split '/')[-1] -or ($nc.Project -and $row.project_tag -ne $nc.Project)) { throw 'Read-back failed: source or project tag is not as deployed.' }
 return $row

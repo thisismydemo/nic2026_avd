@@ -19,7 +19,6 @@ Permits changes. Without this switch, the script runs in WhatIf mode.
 #>
 [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
 param(
-    [Parameter(Mandatory)]
     [string]$TenantId,
 
     [string[]]$TargetDeviceGroupName = @(),
@@ -32,6 +31,10 @@ $ErrorActionPreference = 'Stop'
 if (-not $Execute) { $WhatIfPreference = $true }
 
 . (Join-Path $PSScriptRoot 'LzAvd.Common.ps1')
+
+# The tenant comes from the AVD environment file (tenant_id) unless -TenantId is passed.
+if (-not $TenantId) { $TenantId = (Get-LzAvdEntraDefault).TenantId }
+if (-not $TenantId) { throw 'TenantId is not set: pass -TenantId or set tenant_id in the environment file.' }
 
 $requiredCommands = @{
     'Connect-MgGraph'                                                             = 'Microsoft.Graph.Authentication'

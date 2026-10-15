@@ -15,7 +15,7 @@ Succeeded, writes an ARM JSON parameters file to the temp folder (removed after 
      guest that answers has no DHCP-supplied gateway after -GatewayTimeoutMinutes (the AD join and Arc onboarding
      need it). After the deployment, a host whose Arc agent is not Connected gets guest management re-triggered
      (az stack-hci-vm update --enable-agent true, Learn: Manage Azure Local VMs).
-  2. Merges the environment tags (project=nic26 and the realm tags) onto each Arc machine and NIC and reads them back.
+  2. Merges the environment tags (the shared tags and the realm tags) onto each Arc machine and NIC and reads them back.
   3. Register-AvdSessionHostsAzureLocal.ps1: a fresh registration token per host, passed only as an Arc Run Command
      protected parameter (K-7), then waits for Available.
 Re-running is safe: the deployment is incremental and a host that is already Available in the pool is skipped by
@@ -59,6 +59,9 @@ if (-not (Get-Command Resolve-NIC26KeyVaultRef -ErrorAction SilentlyContinue)) {
 . (Join-Path $PSScriptRoot '../../../shared/scripts/NIC26.GuestNetwork.ps1')
 
 $envData = Get-Content -LiteralPath $EnvironmentFile -Raw | ConvertFrom-Yaml
+# Org, naming token, region code and shared tags come from the environment folder (Get-NIC26Config), never from this script.
+$environmentFolder = Split-Path -Path (Resolve-Path -LiteralPath $EnvironmentFile).Path -Parent
+$namingContext = Get-NIC26NamingContext -Config (Get-NIC26Config -Scope avd -Path $environmentFolder)
 $cfg = $envData['azl_session_hosts']
 if ($null -eq $cfg) { throw 'environment file has no azl_session_hosts section.' }
 $azlSub = [string]$envData['subscription_id_azl']
@@ -190,14 +193,15 @@ for ($i = 0; $i -lt $hosts.Count; $i++) {
     $memoryPerHost.Add([int]($h['memory_mb'] ?? 0))
 }
 
-$tags = [ordered]@{ project = 'nic26'; environment = 'demo' }
+$tags = [ordered]@{}
+foreach ($key in @('project', 'environment')) { if ($namingContext.Tags.Contains($key)) { $tags[$key] = [string]$namingContext.Tags[$key] } }
 foreach ($key in @($cfg['tags'].Keys)) { $tags[$key] = [string]$cfg['tags'][$key] }
 
 $parameters = [ordered]@{
-    org                 = @{ value = 'iic' }
-    naming_token           = @{ value = 'nic26' }
+    org                 = @{ value = $namingContext.Org }
+    naming_token        = @{ value = $namingContext.Token }
     location            = @{ value = $customLocation.Location }
-    location_short      = @{ value = 'n/a' }
+    location_short      = @{ value = $namingContext.Region }
     tenant_id           = @{ value = (Get-AzContext).Tenant.Id }
     subscription_id_azl = @{ value = $azlSub }
     tags                = @{ value = $tags }
@@ -282,7 +286,7 @@ foreach ($h in $hosts) {
             "/subscriptions/$azlSub/resourceGroups/$rg/providers/Microsoft.AzureStackHCI/networkInterfaces/$($h['nic_name'])")) {
         $null = Update-AzTag -ResourceId $id -Tag ([hashtable]$tags) -Operation Merge
         $read = (Get-AzTag -ResourceId $id).Properties.TagsProperty
-        if ($read['project'] -ne 'nic26') { throw "Tag project=nic26 missing on $id." }
+        if ($namingContext.Project -and $read['project'] -ne $namingContext.Project) { throw "Tag project=$($namingContext.Project) missing on $id." }
     }
     $ext = Get-AzConnectedMachineExtension -ResourceGroupName $rg -MachineName $h['name'] -SubscriptionId $azlSub
     Write-Information ("{0}: " -f $h['name'] + (($ext | ForEach-Object { "$($_.Name)=$($_.ProvisioningState)" }) -join ', '))

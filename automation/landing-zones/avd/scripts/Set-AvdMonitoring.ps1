@@ -28,6 +28,7 @@ $config = Get-NIC26Config -Scope avd
 $lz = ConvertTo-NIC26TfVars -Solution (Join-Path $repoRoot 'automation\landing-zones\avd') -Config $config | ConvertFrom-Json -Depth 50
 $cp = ConvertTo-NIC26TfVars -Solution (Join-Path $repoRoot 'automation\avd\control-plane') -Config $config | ConvertFrom-Json -Depth 50
 $v = $config.values
+$nc = Get-NIC26NamingContext -Config $config
 $lawId = [string]$v['log_analytics_workspace_id']
 $agId = [string]$v['action_group_id']
 if (-not $lawId -or -not $agId) { throw 'environment/avd needs log_analytics_workspace_id and action_group_id.' }
@@ -46,10 +47,10 @@ $scalingPlans = @($cpNames.PSObject.Properties | Where-Object { $_.Value -like '
 if (-not $workspaceName -or $hostPools.Count -eq 0) { throw 'Could not resolve the AVD workspace / host pool names from the avd-control-plane catalog.' }
 
 $deployments = @(
-    @{ ResourceGroupName = $names['rg_mon']; Name = 'dep-iic-nic26-avd-monitoring-day2'; TemplateFile = (Join-Path $PSScriptRoot '..\bicep\modules\monitoring.bicep')
+    @{ ResourceGroupName = $names['rg_mon']; Name = (New-NIC26ResourceName -Type dep -Purpose 'avd-monitoring-day2' -Org $nc.Org -Token $nc.Token); TemplateFile = (Join-Path $PSScriptRoot '..\bicep\modules\monitoring.bicep')
         TemplateParameterObject = @{ location = [string]$lz.location; tags = $tags; names = $names; log_analytics_workspace_id = $lawId; action_group_id = $agId } 
     }
-    @{ ResourceGroupName = $names['rg_control']; Name = 'dep-iic-nic26-avd-diagnostics-day2'; TemplateFile = (Join-Path $PSScriptRoot '..\bicep\modules\control-plane-diagnostics.bicep')
+    @{ ResourceGroupName = $names['rg_control']; Name = (New-NIC26ResourceName -Type dep -Purpose 'avd-diagnostics-day2' -Org $nc.Org -Token $nc.Token); TemplateFile = (Join-Path $PSScriptRoot '..\bicep\modules\control-plane-diagnostics.bicep')
         TemplateParameterObject = @{ log_analytics_workspace_id = $lawId; workspace_name = $workspaceName; host_pool_names = $hostPools; scaling_plan_names = $scalingPlans } 
     }
 )

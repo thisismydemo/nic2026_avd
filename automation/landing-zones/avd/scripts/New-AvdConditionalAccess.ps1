@@ -33,13 +33,10 @@ Permits changes. Without this switch, the script runs in WhatIf mode.
 #>
 [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
 param(
-    [Parameter(Mandatory)]
     [string]$TenantId,
 
-    [Parameter(Mandatory)]
     [string]$UsersGroupName,
 
-    [Parameter(Mandatory)]
     [string]$NamePrefix,
 
     [ValidateSet('enabledForReportingButNotEnforced', 'enabled')]
@@ -62,6 +59,17 @@ $ErrorActionPreference = 'Stop'
 if (-not $Execute) { $WhatIfPreference = $true }
 
 . (Join-Path $PSScriptRoot 'LzAvd.Common.ps1')
+
+# Every parameter left out comes from the AVD environment file (tenant_id, entra_groups.avd_users, ca_policy_name).
+if (-not ($TenantId -and $UsersGroupName -and $NamePrefix)) {
+    $envDefaults = Get-LzAvdEntraDefault
+    if (-not $TenantId) { $TenantId = $envDefaults.TenantId }
+    if (-not $UsersGroupName) { $UsersGroupName = $envDefaults.UsersGroupName }
+    if (-not $NamePrefix) { $NamePrefix = $envDefaults.CaPolicyName }
+}
+foreach ($required in 'TenantId', 'UsersGroupName', 'NamePrefix') {
+    if (-not (Get-Variable -Name $required -ValueOnly)) { throw "$required is not set: pass -$required or set the matching key in the environment file." }
+}
 
 $requiredCommands = @{
     'Connect-MgGraph'                       = 'Microsoft.Graph.Authentication'

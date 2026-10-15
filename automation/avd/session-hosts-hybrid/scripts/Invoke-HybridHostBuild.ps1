@@ -62,6 +62,10 @@ if (-not (Get-Command Resolve-NIC26KeyVaultRef -ErrorAction SilentlyContinue)) {
 }
 
 $envData = Get-Content -LiteralPath $EnvironmentFile -Raw | ConvertFrom-Yaml
+# project and environment tag values come from the environment folder (Get-NIC26Config), never from this script.
+$namingContext = Get-NIC26NamingContext -Config (Get-NIC26Config -Scope avd -Path (Split-Path -Path (Resolve-Path -LiteralPath $EnvironmentFile).Path -Parent))
+$baseTags = [ordered]@{}
+foreach ($key in @('project', 'environment')) { if ($namingContext.Tags.Contains($key)) { $baseTags[$key] = [string]$namingContext.Tags[$key] } }
 $h = $envData['hybrid']
 $avdSub = [string]$envData['subscription_id_avd']
 $refs = $envData['secret_refs']
@@ -219,7 +223,7 @@ foreach ($vm in $vms) {
             Root = (Join-Path (Join-Path $h['csv_path'] 'hyperv') $name); Master = [string]$h['master_vhdx']
             Switch = [string]$h['compute_switch_name']; Vlan = [int]$h['vlan_id']; Cpu = [int]$h['vcpu']
             MemoryBytes = [long]$h['memory_gb'] * 1GB; DiskBytes = [long]$h['disk_gb'] * 1GB
-            AntiAffinity = [string]$h['anti_affinity_class']; Notes = "AVD Hybrid session host ($($envData['realms']['hybrid']['friendly_name'])); project=nic26"
+            AntiAffinity = [string]$h['anti_affinity_class']; Notes = "AVD Hybrid session host ($($envData['realms']['hybrid']['friendly_name'])); project=$($namingContext.Project)"
         }
         if ($PSCmdlet.ShouldProcess($name, 'Create clustered Hyper-V VM')) {
             Invoke-Command -ComputerName $node -Credential $nodeCred -ScriptBlock {
@@ -314,7 +318,7 @@ foreach ($vm in $vms) {
     $arc = Get-AzConnectedMachine -SubscriptionId $avdSub -ResourceGroupName $h['arc_resource_group'] -Name $name -ErrorAction SilentlyContinue
     if (($null -eq $arc -or $arc.Status -ne 'Connected') -and $PSCmdlet.ShouldProcess($name, 'Connect Azure Arc')) {
         $token = (Get-AzAccessToken -ResourceUrl 'https://management.azure.com/' -AsSecureString).Token
-        $tags = @{ project = 'nic26'; environment = 'demo'; workload = 'avd'; 'managed-by' = 'script' }
+        $tags = @{} + $baseTags + @{ workload = 'avd'; 'managed-by' = 'script' }
         foreach ($k in @($h['arc_tags'].Keys)) { $tags[$k] = [string]$h['arc_tags'][$k] }
         $tagList = ($tags.Keys | Sort-Object | ForEach-Object { "$_=$($tags[$_])" }) -join ','
         try {
@@ -353,7 +357,7 @@ foreach ($vm in $vms) {
         $put = Invoke-AzRestMethod -Method PUT -Path $assocUri -Payload (@{ properties = @{ dataCollectionRuleId = $dcrId } } | ConvertTo-Json)
         if ($put.StatusCode -notin 200, 201) { throw "DCR association failed for $name ($($put.StatusCode))." }
     }
-    $null = Update-AzTag -ResourceId $arc.Id -Tag @{ project = 'nic26'; environment = 'demo'; workload = 'avd'; 'managed-by' = 'script'; realm = 'hybrid' } -Operation Merge
+    $null = Update-AzTag -ResourceId $arc.Id -Tag (@{} + $baseTags + @{ workload = 'avd'; 'managed-by' = 'script'; realm = 'hybrid' }) -Operation Merge
     $readTags = (Get-AzTag -ResourceId $arc.Id).Properties.TagsProperty
     Write-Information "$name Arc: $($arc.Status); project=$($readTags['project'])"
 }

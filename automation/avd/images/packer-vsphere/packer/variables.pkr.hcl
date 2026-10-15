@@ -10,6 +10,11 @@ variable "customizer_tokens" {
   default = {}
 }
 
+variable "answer_cd_label" {
+  type    = string
+  default = "AUTOUNATTEND"
+}
+
 variable "winrm_timeout" {
   type    = string
   default = "2h"
@@ -31,8 +36,7 @@ variable "arc_agent_uri" {
 }
 
 variable "arc_agent_directory" {
-  type    = string
-  default = "C:\\IIC\\ArcAgent"
+  type = string
 }
 
 variable "shortpath_port" {
@@ -67,8 +71,7 @@ variable "product_key" {
 }
 
 variable "build_username" {
-  type    = string
-  default = "build-admin"
+  type = string
 }
 
 # Supplied only as PKR_VAR_build_password in the child process environment.
@@ -93,8 +96,7 @@ variable "disk_size_mb" {
 }
 
 variable "vm_name" {
-  type    = string
-  default = "avd-w11-ent"
+  type = string
 }
 
 variable "vcenter_server" {

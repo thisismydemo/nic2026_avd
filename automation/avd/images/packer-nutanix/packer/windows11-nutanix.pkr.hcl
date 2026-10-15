@@ -78,7 +78,7 @@ source "nutanix" "image" {
       product_key    = var.product_key
     })
   }
-  cd_label = "IICANSWER"
+  cd_label = var.answer_cd_label
 
   # Windows UEFI media asks to press a key to boot from the CD.
   boot_wait    = "3s"

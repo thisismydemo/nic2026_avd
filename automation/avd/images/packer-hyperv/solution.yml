@@ -4,19 +4,35 @@ scope: avd
 tools: [packer, powershell]
 depends_on: [lz-azure-local]
 
+# Every Packer variable is filled from the environment file by ConvertTo-NIC26PackerVars (packer_var names the Packer
+# variable); scripts/Invoke-PackerBuild.ps1 -EnvironmentPath does that, resolves the build account from Key Vault in memory
+# and runs the build. The Packer directory also holds windows11.auto.pkrvars.example.json to show the variable shape.
 inputs:
   - { name: org, type: string, description: "Organization identifier.", required: true, source: environment }
   - { name: naming_token, type: string, description: "Naming token.", required: true, source: environment, path: token }
   - { name: hybrid_csv_path, type: string, description: "Azure Local cluster shared volume root.", required: true, source: environment, path: hybrid.csv_path }
-  - { name: compute_switch_name, type: string, description: "Hyper-V compute switch of the build VM.", required: true, source: environment, path: hybrid.compute_switch_name }
-  - { name: hybrid_vlan_id, type: int, description: "VLAN of the build VM.", required: true, source: environment, path: hybrid.vlan_id }
-  - { name: packer_iso_path, type: string, description: "Windows 11 Enterprise volume-license ISO.", required: true, source: environment, path: images.packer_iso_path }
-  - { name: packer_iso_checksum, type: string, description: "SHA-256 of the ISO (sha256:<hex>).", required: true, source: environment, path: images.packer_iso_checksum }
-  - { name: packer_output_path, type: string, description: "Packer output directory.", required: true, source: environment, path: images.packer_output_path }
+  - { name: compute_switch_name, type: string, description: "Hyper-V compute switch of the build VM.", required: true, source: environment, path: hybrid.compute_switch_name, packer_var: switch_name }
+  - { name: hybrid_vlan_id, type: int, description: "VLAN of the build VM.", required: true, source: environment, path: hybrid.vlan_id, packer_var: vlan_id }
+  - { name: packer_iso_path, type: string, description: "Windows 11 Enterprise volume-license ISO.", required: true, source: environment, path: images.packer_iso_path, packer_var: iso_path }
+  - { name: packer_iso_checksum, type: string, description: "SHA-256 of the ISO (sha256:<hex>).", required: true, source: environment, path: images.packer_iso_checksum, packer_var: iso_checksum }
+  - { name: packer_output_path, type: string, description: "Packer output directory.", required: true, source: environment, path: images.packer_output_path, packer_var: output_directory }
   - { name: hybrid_image_vhdx, type: string, description: "Intended generalized image path (relative to hybrid_csv_path).", required: true, source: environment, path: images.hybrid_image_vhdx }
-  - { name: shortpath_managed_port, type: int, description: "RDP Shortpath managed-networks UDP port.", required: true, source: environment }
-  - { name: build_admin_username_secret, type: secret-ref, description: "keyvault:// reference of the build administrator user name (logical secret avd-image-build-admin).", required: true, source: keyvault }
-  - { name: build_admin_password_secret, type: secret-ref, description: "keyvault:// reference of the build administrator password (logical secret avd-image-build-admin); resolved in memory by scripts/Invoke-PackerBuild.ps1.", required: true, source: keyvault }
+  - { name: shortpath_managed_port, type: int, description: "RDP Shortpath managed-networks UDP port.", required: true, source: environment, packer_var: shortpath_port }
+  - { name: packer_cpus, type: int, description: "vCPUs of the build VM.", required: false, default: 4, source: environment, path: images.packer_cpus, packer_var: cpus }
+  - { name: packer_memory_mb, type: int, description: "Memory of the build VM in MB.", required: false, default: 8192, source: environment, path: images.packer_memory_mb, packer_var: memory_mb }
+  - { name: packer_disk_size_mb, type: int, description: "OS disk size of the build VM in MB.", required: false, default: 131072, source: environment, path: images.packer_disk_size_mb, packer_var: disk_size_mb }
+  - { name: packer_winrm_timeout, type: string, description: "How long Packer waits for WinRM (Go duration).", required: false, default: "2h", source: environment, path: images.packer_winrm_timeout, packer_var: winrm_timeout }
+  - { name: image_version, type: string, description: "Version recorded for the built image.", required: false, default: "1.0.0", source: environment, path: images.image_version, packer_var: image_version }
+  - { name: arc_agent_uri, type: string, description: "Download address of the Azure Connected Machine agent MSI (installed in the image, never connected).", required: false, default: "https://aka.ms/AzureConnectedMachineAgent", source: environment, path: images.arc_agent_uri, packer_var: arc_agent_uri }
+  - { name: arc_agent_directory, type: string, description: "Folder inside the image where the Arc agent installer is kept.", required: false, default: "C:\\ArcAgent", source: environment, path: images.arc_agent_directory, packer_var: arc_agent_directory }
+  - { name: defender_paths, type: string, description: "Semicolon-separated local Defender path exclusions.", required: false, default: "", source: environment, packer_var: defender_paths }
+  - { name: defender_processes, type: string, description: "Semicolon-separated local Defender process exclusions.", required: false, default: "", source: environment, packer_var: defender_processes }
+  - { name: vdot_archive_uri, type: string, description: "Pinned VDOT ZIP URI, or empty to skip.", required: false, default: "", source: environment, packer_var: vdot_archive_uri }
+  - { name: vdot_archive_sha256, type: string, description: "Expected SHA-256 of the VDOT ZIP.", required: false, default: "", source: environment, packer_var: vdot_archive_sha256 }
+  - { name: install_teams_app, type: string, description: "'true' provisions new Teams; 'false' for the Microsoft 365 marketplace source.", required: false, default: "false", source: environment, packer_var: customizer_tokens.install_teams_app }
+  - { name: disable_teams_autoupdate, type: string, description: "'true' disables Teams automatic updates.", required: false, default: "false", source: environment, packer_var: customizer_tokens.disable_teams_autoupdate }
+  - { name: build_admin_username_secret, type: secret-ref, description: "keyvault:// reference of the build administrator user name (logical secret avd-image-build-admin); resolved in memory by scripts/Invoke-PackerBuild.ps1.", required: true, source: keyvault, path: images.build_admin_username_secret }
+  - { name: build_admin_password_secret, type: secret-ref, description: "keyvault:// reference of the build administrator password (logical secret avd-image-build-admin); resolved in memory by scripts/Invoke-PackerBuild.ps1.", required: true, source: keyvault, path: images.build_admin_password_secret }
 
 outputs:
   - { name: hybrid_image_vhdx_path, type: string, description: "Path of the built, generalized VHDX." }
@@ -26,4 +42,4 @@ secrets: [avd-image-build-admin]
 destroy: supported
 
 names:
-  build_vm: { type: vm, purpose: img-build }
+  vm_name: { type: vm, purpose: img-build }

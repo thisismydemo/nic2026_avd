@@ -19,10 +19,10 @@
 #>
 [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
 param(
-    [Parameter(Mandatory)][string]$TenantId,
-    [Parameter(Mandatory)][string]$SubscriptionId,
-    [Parameter(Mandatory)][string]$ResourceGroupName,
-    [Parameter(Mandatory)][string]$StorageAccountName,
+    [string]$TenantId,
+    [string]$SubscriptionId,
+    [string]$ResourceGroupName,
+    [string]$StorageAccountName,
     [string[]]$ConditionalAccessPolicyNames = @(),
     [string]$StorageDnsSuffix = 'file.core.windows.net',
     # Owner decision D-029: no private endpoints by default, so the privatelink identifier URI is only added on request.
@@ -32,6 +32,21 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'LzAvd.Common.ps1')
+
+# Every parameter left out comes from the AVD environment file: tenant_id, subscription_id_avd and the lz-avd names catalog
+# (names.rg_stor, names.fslogix_sa); nothing is typed into this script.
+if (-not ($TenantId -and $SubscriptionId -and $ResourceGroupName -and $StorageAccountName)) {
+    $envDefaults = Get-LzAvdEntraDefault
+    $envConfig = Get-NIC26Config -Scope avd
+    $lzNames = (ConvertTo-NIC26TfVars -Solution (Get-LzAvdSolutionRoot) -Config $envConfig | ConvertFrom-Json).names
+    if (-not $TenantId) { $TenantId = $envDefaults.TenantId }
+    if (-not $SubscriptionId) { $SubscriptionId = [string]$envConfig.values['subscription_id_avd'] }
+    if (-not $ResourceGroupName) { $ResourceGroupName = [string]$lzNames.rg_stor }
+    if (-not $StorageAccountName) { $StorageAccountName = [string]$lzNames.fslogix_sa }
+}
+foreach ($required in 'TenantId', 'SubscriptionId', 'ResourceGroupName', 'StorageAccountName') {
+    if (-not (Get-Variable -Name $required -ValueOnly)) { throw "$required is not set: pass -$required or set the matching key in the environment file." }
+}
 
 if (-not $Execute) { $WhatIfPreference = $true }
 

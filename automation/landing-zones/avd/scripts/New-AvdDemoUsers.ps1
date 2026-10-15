@@ -1,7 +1,7 @@
 #Requires -Version 7.0
 <#
 .SYNOPSIS
-    Creates the cloud-only IIC demo users (design/avd/landing-zone.md section 5.2) with generated passwords that go
+    Creates the cloud-only demo users (design/avd/landing-zone.md section 5.2) with generated passwords that go
     straight into the operations Key Vault. Runs on the Windows jump server. -WhatIf is the default.
 .DESCRIPTION
     For each name in -Users a user <name>@<Domain> is created through Microsoft Graph if it does not exist. The
@@ -9,20 +9,20 @@
     <SecretNamePrefix>-avd-demo-user-<name>-username / -password (90-day expiry, five tags). It is never printed,
     logged, returned or written to disk. Existing users are left untouched unless -ResetPassword is given.
 .EXAMPLE
-    .\New-AvdDemoUsers.ps1 -TenantId <id> -Users user1,user2 -NamingToken <token> -UsersGroupName <union-users-group> -Domain contoso.com -KeyVaultName <ops-key-vault> -SecretNamePrefix <org>-<token>
+    .\New-AvdDemoUsers.ps1                      # every value from the environment file (what-if)
 .EXAMPLE
-    .\New-AvdDemoUsers.ps1 -TenantId <id> -Users user1,user2 -NamingToken <token> -UsersGroupName <union-users-group> -Domain contoso.com -KeyVaultName <ops-key-vault> -SecretNamePrefix <org>-<token> -OwnerEmail owner@contoso.com -Execute
+    .\New-AvdDemoUsers.ps1 -Users user1,user2 -Execute   # explicit parameters override the environment file
 #>
 [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
 param(
-    [Parameter(Mandatory)][string]$TenantId,
-    [Parameter(Mandatory)][string]$Domain,
-    [Parameter(Mandatory)][string]$KeyVaultName,
-    [Parameter(Mandatory)][string]$SecretNamePrefix,
-    [Parameter(Mandatory)][string[]]$Users,
-    [string]$UsageLocation = 'US',
+    [string]$TenantId,
+    [string]$Domain,
+    [string]$KeyVaultName,
+    [string]$SecretNamePrefix,
+    [string[]]$Users,
+    [string]$UsageLocation,
     [string]$OwnerEmail,
-    [Parameter(Mandatory)][string]$NamingToken,
+    [string]$NamingToken,
     [string]$UsersGroupName,
     [int]$SecretExpiryDays = 90,
     [switch]$ResetPassword,
@@ -31,6 +31,24 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'LzAvd.Common.ps1')
+
+# Every parameter left out comes from the AVD environment file (tenant_id, demo_user_domain, key_vault_id, secret_name_prefix, owner_email,
+# demo_user_usage_location, demo_users, token); nothing is typed into this script.
+if (-not ($TenantId -and $Domain -and $KeyVaultName -and $SecretNamePrefix -and $UsageLocation -and $NamingToken -and $Users)) {
+    $envDefaults = Get-LzAvdEntraDefault
+    if (-not $TenantId) { $TenantId = $envDefaults.TenantId }
+    if (-not $Domain) { $Domain = $envDefaults.Domain }
+    if (-not $KeyVaultName) { $KeyVaultName = $envDefaults.KeyVaultName }
+    if (-not $SecretNamePrefix) { $SecretNamePrefix = $envDefaults.SecretNamePrefix }
+    if (-not $OwnerEmail) { $OwnerEmail = $envDefaults.OwnerEmail }
+    if (-not $UsageLocation) { $UsageLocation = $envDefaults.UsageLocation }
+    if (-not $NamingToken) { $NamingToken = $envDefaults.NamingToken }
+    if (-not $Users) { $Users = $envDefaults.DemoUsers }
+    if (-not $UsersGroupName) { $UsersGroupName = $envDefaults.UsersGroupName }
+}
+foreach ($required in 'TenantId', 'Domain', 'KeyVaultName', 'SecretNamePrefix', 'UsageLocation', 'NamingToken', 'Users') {
+    if (-not (Get-Variable -Name $required -ValueOnly)) { throw "$required is not set: pass -$required or set the matching key in the environment file (demo_user_usage_location for -UsageLocation)." }
+}
 
 if (-not $Execute) { $WhatIfPreference = $true }
 if ($Execute) { Assert-LzAvdWindowsHost }

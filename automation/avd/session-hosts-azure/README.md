@@ -7,9 +7,9 @@ Authored by gpt-6-sol via the HCS Foundry gateway; external review is recorded i
 ## Order
 
 1. Deploy `lz-avd`, `avd-control-plane` and `avd-images-azure`.
-2. Supply the generated names and the dependency outputs. For Terraform, initialise the private backend.
-3. Run `scripts/Invoke-SessionHostsAzureDeploy.ps1` without `-Execute` (What-If / plan), then with `-Execute`. Bicep takes an ARM JSON parameters file (`az bicep build-params bicep/main.example.bicepparam`); the wrapper supplies the two secure admin parameters at run time.
-4. Run `scripts/Register-AvdSessionHosts.ps1` without `-Execute` to preview, then with `-Execute`, passing the control-plane `New-AvdRegistrationToken.ps1` as `-TokenScriptPath`.
+2. Generate the inputs from your environment file: `ConvertTo-NIC26BicepParam -Solution avd-session-hosts-azure -Config (Get-NIC26Config -Scope avd) -Execute` (or `ConvertTo-NIC26TfVars` for Terraform, with the backend file from `New-NIC26TerraformBackendConfig`). Then add the dependency outputs of the earlier stages (identity ids, the data collection rule, the host pool); the generated file holds the environment values and the names only.
+3. Run `scripts/Invoke-SessionHostsAzureDeploy.ps1` without `-Execute` (What-If / plan), then with `-Execute`. Bicep takes an ARM JSON parameters file (`az bicep build-params bicep/main.generated.bicepparam --outfile <file>`, from the file generated in step 2; `main.example.bicepparam` only shows the shape and is not edited); the wrapper supplies the two secure admin parameters at run time.
+4. Run `scripts/Register-AvdSessionHosts.ps1` without `-Execute` to preview, then with `-Execute`. Subscription, resource groups, host pool, VM names and the token script come from the environment file (`-EnvironmentFile`, default `environment/avd/environment.yml`); every explicit parameter overrides.
 
 The deploy wrapper needs the `NIC26.Automation` module imported and `keyvault://` references for the administrator credentials.
 

@@ -98,7 +98,11 @@ foreach ($current in $stages) {
                 Invoke-LzAvdNative -FilePath 'az' -ArgumentList @('deployment', 'sub', 'what-if', '--subscription', $inputs.subscription_id_avd, '--location', $inputs.location, '--name', $deploymentName, '--template-file', (Join-Path $bicepDir 'main.bicep'), '--parameters', $bicepParamFile)
             }
             else {
-                if (-not $BackendConfig) { throw 'Terraform Preview/Deploy needs -BackendConfig <environment/.../backend.hcl> (contract section 3).' }
+                if (-not $BackendConfig) {
+                    # No explicit file: render the state location from terraform_backend in the environment file.
+                    try { $BackendConfig = (New-NIC26TerraformBackendConfig -Solution $Solution -Config $config -Execute -WhatIf:$false).FullName }
+                    catch { throw "Terraform Preview/Deploy needs -BackendConfig <backend.hcl> or terraform_backend in the environment file (contract section 3): $($_.Exception.Message)" }
+                }
                 Invoke-LzAvdNative -FilePath 'terraform' -ArgumentList @('init', '-input=false', "-backend-config=$BackendConfig") -WorkingDirectory $tfDir
                 Invoke-LzAvdNative -FilePath 'terraform' -ArgumentList @('plan', '-input=false', "-var-file=$tfVarsFile", "-out=$Solution.tfplan") -WorkingDirectory $tfDir
             }

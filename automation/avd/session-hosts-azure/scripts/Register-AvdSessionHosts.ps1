@@ -6,6 +6,8 @@ Registers deployed Azure VMs as AVD session hosts.
 Generates a fresh registration token per VM and supplies it only as a protected managed Run Command parameter (K-7).
 The Run Command is always removed afterwards. Only its execution state and exit code are read, never its output.
 Without -Execute the script reports the intended work and does not request a token.
+.PARAMETER EnvironmentFile
+AVD environment file (default: <repo>\environment\avd\environment.yml). Every value left out (subscription, resource groups, host pool, VM names, token script) is derived from it; explicit parameters override.
 .PARAMETER SubscriptionId
 Subscription of the VMs and the host pool.
 .PARAMETER ResourceGroupName
@@ -29,12 +31,14 @@ Perform the registration; otherwise nothing changes.
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
-    [Parameter(Mandatory)][string]$SubscriptionId,
-    [Parameter(Mandatory)][string]$ResourceGroupName,
-    [Parameter(Mandatory)][string]$HostPoolResourceGroup,
-    [Parameter(Mandatory)][string]$HostPoolName,
-    [Parameter(Mandatory)][string[]]$VmName,
-    [Parameter(Mandatory)][string]$TokenScriptPath,
+    # Path of the AVD environment file (default: <repo>\environment\avd\environment.yml); every value left out below comes from it.
+    [string]$EnvironmentFile,
+    [string]$SubscriptionId,
+    [string]$ResourceGroupName,
+    [string]$HostPoolResourceGroup,
+    [string]$HostPoolName,
+    [string[]]$VmName,
+    [string]$TokenScriptPath,
     [ValidateRange(1, 24)][int]$ExpirationHours = 2,
     [ValidateRange(1, 1440)][int]$WaitMinutes = 20,
     # Name of the Azure run command created on each machine (removed again after the run); change it to avoid collisions.
@@ -49,6 +53,25 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+# Values left out come from the AVD environment file (-EnvironmentFile, default: <repo>\environment\avd): subscription, resource
+# groups, host pool and machine names are derived from it and the solution name catalogs. Explicit parameters override.
+if (-not ($SubscriptionId -and $ResourceGroupName -and $HostPoolResourceGroup -and $HostPoolName -and $VmName)) {
+    if (-not (Get-Command Get-NIC26AvdHostContext -ErrorAction SilentlyContinue)) {
+        Import-Module (Resolve-Path (Join-Path $PSScriptRoot '..\..\..\shared\powershell\NIC26.Automation\NIC26.Automation.psd1')).Path
+    }
+    $configArguments = @{ Scope = 'avd' }
+    if ($EnvironmentFile) { $configArguments.Path = Split-Path -Path (Resolve-Path -LiteralPath $EnvironmentFile).Path -Parent }
+    $hostContext = Get-NIC26AvdHostContext -Realm azure -Config (Get-NIC26Config @configArguments)
+    if (-not $SubscriptionId) { $SubscriptionId = $hostContext.SubscriptionId }
+    if (-not $ResourceGroupName) { $ResourceGroupName = $hostContext.ResourceGroupName }
+    if (-not $HostPoolResourceGroup) { $HostPoolResourceGroup = $hostContext.HostPoolResourceGroup }
+    if (-not $HostPoolName) { $HostPoolName = $hostContext.HostPoolName }
+    if (-not $VmName) { $VmName = $hostContext.VmName }
+}
+if (-not $TokenScriptPath) { $TokenScriptPath = Join-Path $PSScriptRoot '..\..\control-plane\scripts\New-AvdRegistrationToken.ps1' }
+foreach ($required in 'SubscriptionId', 'ResourceGroupName', 'HostPoolResourceGroup', 'HostPoolName', 'VmName') {
+    if (-not (Get-Variable -Name $required -ValueOnly)) { throw "$required is not set: pass -$required or set the values in the environment file." }
+}
 
 $installer = @'
 param($RegistrationToken, $AgentUri, $BootloaderUri)

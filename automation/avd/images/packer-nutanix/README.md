@@ -14,18 +14,24 @@ It builds a UEFI Secure Boot, vTPM Windows 11 Enterprise single-session image fo
 
 ## Run
 
-In `packer/`, copy `windows11.auto.pkrvars.example.json` to `windows11.auto.pkrvars.json` and replace the placeholders. Secrets are supplied only through the environment (from your secret store), never in a variable file or argument:
+Set the values in your environment file; nothing is edited in a Packer file. The `images.nutanix` block holds the Prism endpoint, account, cluster, subnet and the two image names, `images.build_admin_username_secret` and `images.build_admin_password_secret` are the Key Vault references of the build account, and the optional `images.packer_*`, `images.image_version` and `images.arc_agent_*` keys tune the build (see the commented example in `automation/shared/examples/environment.avd.example.yml`). `packer/windows11.auto.pkrvars.example.json` only shows the shape of the variable file.
 
-```sh
-export PKR_VAR_build_password='<from your secret store>'
-export PKR_VAR_nutanix_password='<from your secret store>'
-cd packer
+Generate the variable file from the environment file, resolve the three secrets into the environment of the shell that runs Packer (never into a file or an argument), then build:
+
+```powershell
+Import-Module ./automation/shared/powershell/NIC26.Automation/NIC26.Automation.psd1
+$cfg = Get-NIC26Config -Scope avd
+ConvertTo-NIC26PackerVars -Solution avd-images-packer-nutanix -Config $cfg -Execute   # writes packer/windows11.generated.auto.pkrvars.json
+$env:PKR_VAR_build_username = Resolve-NIC26KeyVaultRef -Ref $cfg.values.images.build_admin_username_secret -AsPlainText
+$env:PKR_VAR_build_password = Resolve-NIC26KeyVaultRef -Ref $cfg.values.images.build_admin_password_secret -AsPlainText
+$env:PKR_VAR_nutanix_password = Resolve-NIC26KeyVaultRef -Ref $cfg.values.images.nutanix.password_secret -AsPlainText
+Set-Location ./automation/avd/images/packer-nutanix/packer
 packer init .
-packer validate -var-file=windows11.auto.pkrvars.json .
-packer build -var-file=windows11.auto.pkrvars.json .
+packer validate .
+packer build .
 ```
 
-Unset both variables afterwards. Do not commit generated media or Packer logs.
+Packer loads `windows11.generated.auto.pkrvars.json` by itself (the name ends in `.auto.pkrvars.json`). Remove the three variables from the shell afterwards (`Remove-Item Env:PKR_VAR_*`). Do not commit generated media or Packer logs.
 
 ## How the answer file reaches Setup
 

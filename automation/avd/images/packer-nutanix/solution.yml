@@ -1,0 +1,47 @@
+name: avd-images-packer-nutanix
+description: Packer Nutanix AHV take-home build of the Windows 11 Enterprise image for AVD Hybrid session hosts (reference template, not run end to end)
+scope: avd
+tools: [packer, powershell]
+depends_on: [lz-azure-local]
+
+# Every Packer variable is filled from the environment file by ConvertTo-NIC26PackerVars (packer_var names the Packer
+# variable). The build account and the Prism password are secrets: set PKR_VAR_build_username, PKR_VAR_build_password and
+# PKR_VAR_nutanix_password from your secret store in the shell that runs packer (see README.md).
+inputs:
+  - { name: org, type: string, description: "Organization identifier.", required: true, source: environment }
+  - { name: naming_token, type: string, description: "Naming token.", required: true, source: environment, path: token }
+  - { name: nutanix_endpoint, type: string, description: "Prism Central or Prism Element address.", required: true, source: environment, path: images.nutanix.endpoint, packer_var: nutanix_endpoint }
+  - { name: nutanix_port, type: int, description: "Prism port.", required: false, default: 9440, source: environment, path: images.nutanix.port, packer_var: nutanix_port }
+  - { name: nutanix_username, type: string, description: "Prism account the build uses.", required: true, source: environment, path: images.nutanix.username, packer_var: nutanix_username }
+  - { name: nutanix_insecure, type: bool, description: "Skip TLS verification of the Prism certificate.", required: false, default: false, source: environment, path: images.nutanix.insecure, packer_var: nutanix_insecure }
+  - { name: nutanix_cluster_name, type: string, description: "AHV cluster that runs the build VM.", required: true, source: environment, path: images.nutanix.cluster_name, packer_var: cluster_name }
+  - { name: nutanix_subnet_name, type: string, description: "Subnet of the build VM (isolated).", required: true, source: environment, path: images.nutanix.subnet_name, packer_var: subnet_name }
+  - { name: nutanix_iso_image_name, type: string, description: "Prism image that holds the Windows 11 Enterprise ISO.", required: true, source: environment, path: images.nutanix.iso_image_name, packer_var: iso_image_name }
+  - { name: nutanix_virtio_iso_image_name, type: string, description: "Prism image that holds the Windows 11 VirtIO driver ISO.", required: true, source: environment, path: images.nutanix.virtio_iso_image_name, packer_var: virtio_iso_image_name }
+  - { name: nutanix_image_name, type: string, description: "Name of the Prism image Packer creates.", required: true, source: environment, path: images.nutanix.image_name, packer_var: image_name }
+  - { name: packer_cpus, type: int, description: "vCPUs of the build VM.", required: false, default: 4, source: environment, path: images.packer_cpus, packer_var: cpus }
+  - { name: packer_memory_mb, type: int, description: "Memory of the build VM in MB.", required: false, default: 8192, source: environment, path: images.packer_memory_mb, packer_var: memory_mb }
+  - { name: packer_disk_size_mb, type: int, description: "OS disk size of the build VM in MB.", required: false, default: 65536, source: environment, path: images.packer_disk_size_mb, packer_var: disk_size_mb }
+  - { name: packer_winrm_timeout, type: string, description: "How long Packer waits for WinRM (Go duration).", required: false, default: "2h", source: environment, path: images.packer_winrm_timeout, packer_var: winrm_timeout }
+  - { name: image_version, type: string, description: "Version recorded for the built image.", required: false, default: "1.0.0", source: environment, path: images.image_version, packer_var: image_version }
+  - { name: arc_agent_uri, type: string, description: "Download address of the Azure Connected Machine agent MSI (installed in the image, never connected).", required: false, default: "https://aka.ms/AzureConnectedMachineAgent", source: environment, path: images.arc_agent_uri, packer_var: arc_agent_uri }
+  - { name: arc_agent_directory, type: string, description: "Folder inside the image where the Arc agent installer is kept.", required: false, default: "C:\\ArcAgent", source: environment, path: images.arc_agent_directory, packer_var: arc_agent_directory }
+  - { name: shortpath_managed_port, type: int, description: "RDP Shortpath managed-networks UDP port.", required: true, source: environment, packer_var: shortpath_port }
+  - { name: defender_paths, type: string, description: "Semicolon-separated local Defender path exclusions.", required: false, default: "", source: environment, packer_var: defender_paths }
+  - { name: defender_processes, type: string, description: "Semicolon-separated local Defender process exclusions.", required: false, default: "", source: environment, packer_var: defender_processes }
+  - { name: vdot_archive_uri, type: string, description: "Pinned VDOT ZIP URI, or empty to skip.", required: false, default: "", source: environment, packer_var: vdot_archive_uri }
+  - { name: vdot_archive_sha256, type: string, description: "Expected SHA-256 of the VDOT ZIP.", required: false, default: "", source: environment, packer_var: vdot_archive_sha256 }
+  - { name: install_teams_app, type: string, description: "'true' provisions new Teams; 'false' for the Microsoft 365 marketplace source.", required: false, default: "false", source: environment, packer_var: customizer_tokens.install_teams_app }
+  - { name: disable_teams_autoupdate, type: string, description: "'true' disables Teams automatic updates.", required: false, default: "false", source: environment, packer_var: customizer_tokens.disable_teams_autoupdate }
+  - { name: build_admin_username_secret, type: secret-ref, description: "keyvault:// reference of the build administrator user name; resolve it into PKR_VAR_build_username.", required: true, source: keyvault, path: images.build_admin_username_secret }
+  - { name: build_admin_password_secret, type: secret-ref, description: "keyvault:// reference of the build administrator password; resolve it into PKR_VAR_build_password.", required: true, source: keyvault, path: images.build_admin_password_secret }
+  - { name: nutanix_password_secret, type: secret-ref, description: "keyvault:// reference of the Prism account password; resolve it into PKR_VAR_nutanix_password.", required: true, source: keyvault, path: images.nutanix.password_secret }
+
+outputs:
+  - { name: nutanix_image_ref, type: string, description: "Name of the Prism image Packer creates." }
+
+secrets: [avd-image-build-admin]
+destroy: supported
+
+names:
+  vm_name: { type: vm, purpose: img-build }

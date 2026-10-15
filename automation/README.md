@@ -37,13 +37,14 @@ Import-Module .\automation\shared\powershell\NIC26.Automation\NIC26.Automation.p
 $cfg = Get-NIC26Config -Scope avd                    # validates environment/<scope>/*.yml against the schemas
 ConvertTo-NIC26BicepParam -Solution <solution folder or name> -Config $cfg -Execute
 ConvertTo-NIC26TfVars     -Solution <solution folder or name> -Config $cfg -Execute
+# Terraform state: New-NIC26TerraformBackendConfig -Solution <solution folder or name> -Config $cfg -Execute writes the -backend-config file from terraform_backend
 # then the solution's own README: what-if or plan, review, deploy with -Execute, run its tests
 ```
 
 Three things to know about the loop:
 
 - **Wrapper-deployed solutions.** `avd/images/azure`, `avd/session-hosts-azure`, `avd/session-hosts-azure-local` and `avd/session-hosts-hybrid` take outputs of earlier stages (identity ids, the data collection rule, the host pool) and secure values (admin and domain-join credentials) that no environment file holds. The generated parameter file is therefore not complete for them. Deploy them through their wrapper script, which supplies those values in memory; `bicep/main.example.bicepparam` in each folder shows the full shape.
-- **Tuning inputs.** Optional inputs that are not keys of the environment schema (for example the VDOT and Teams switches, `defender_paths`, `enable_scaling_plan`) keep the default in the solution's `solution.yml`; change them there. Everything an environment file can set is in `shared/schemas`.
+- **Tuning inputs.** Optional inputs (for example the VDOT and Teams switches, `defender_paths`, `enable_scaling_plan`, the session-host disk and size settings and the image build and Packer settings) have a default in the solution's `solution.yml`; set them in your environment file to change them. Each one is an optional key of the environment schema with a commented example in `shared/examples`; everything an environment file can set is in `shared/schemas`.
 - **Entry points outside the loop.** `avd/images/packer-nutanix` and `avd/images/packer-vsphere` are Packer templates with their own README and variables file; they have no `solution.yml`.
 
 ## Your configuration

@@ -237,3 +237,43 @@ function Test-LzAvdCommand {
     param([Parameter(Mandatory)][string]$Name)
     return [bool](Get-Command -Name $Name -ErrorAction SilentlyContinue)
 }
+
+function Get-LzAvdEntraDefault {
+    <#
+    .SYNOPSIS
+        Reads the Entra-script defaults (tenant, domain, org, naming token, ops vault, secret prefix, owner, usage location,
+        demo users, group names) from the AVD environment file, so no value has to be typed or kept in a script.
+    .DESCRIPTION
+        Uses Get-NIC26Config -Scope avd (environment\avd + environment\shared). The ops vault is the last segment of
+        key_vault_id; the secret prefix loses its trailing hyphen (the scripts add their own). Fails with a clear message when
+        the environment file cannot be loaded; callers use it only for parameters the operator did not pass.
+    #>
+    [CmdletBinding()]
+    [OutputType([pscustomobject])]
+    param()
+    [void](Import-LzAvdAutomationModule)
+    $config = Get-NIC26Config -Scope avd
+    $values = $config.values
+    $context = Get-NIC26NamingContext -Config $config
+    $get = { param([string]$Key) if ($values.Contains($Key) -and -not [string]::IsNullOrWhiteSpace([string]$values[$Key])) { [string]$values[$Key] } else { '' } }
+    $vault = ''
+    if ($values.Contains('key_vault_id') -and $values['key_vault_id']) { $vault = ([string]$values['key_vault_id']).TrimEnd('/').Split('/')[-1] }
+    $domain = & $get 'demo_user_domain'
+    if (-not $domain) { $domain = & $get 'tenant_domain' }
+    $users = @()
+    if ($values.Contains('demo_users')) { $users = @($values['demo_users'] | ForEach-Object { ([string]$_['upn']).Split('@')[0] }) }
+    $groups = if ($values.Contains('entra_groups')) { $values['entra_groups'] } else { @{} }
+    return [pscustomobject]@{
+        TenantId         = & $get 'tenant_id'
+        Domain           = $domain
+        Org              = $context.Org
+        NamingToken      = $context.Token
+        KeyVaultName     = $vault
+        SecretNamePrefix = $context.SecretNamePrefix.TrimEnd('-')
+        OwnerEmail       = & $get 'owner_email'
+        UsageLocation    = & $get 'demo_user_usage_location'
+        DemoUsers        = $users
+        UsersGroupName   = if ($groups.Contains('avd_users')) { [string]$groups['avd_users'] } else { '' }
+        CaPolicyName     = & $get 'ca_policy_name'
+    }
+}

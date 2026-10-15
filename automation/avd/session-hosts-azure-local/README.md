@@ -10,9 +10,9 @@ Authored by gpt-6-sol via the HCS Foundry gateway; external review is recorded i
 
 1. Deploy `lz-azure-local`; configure the cluster and its image (`cluster-configure`, `avd-images-azure-local`).
 2. Deploy `lz-avd` and `avd-control-plane`; the host pool must be the Azure Local one (a host pool holds hosts from Azure **or** Azure Local, never both).
-3. Supply the generated names and the dependency outputs. Bicep takes an ARM JSON parameters file (`az bicep build-params bicep/main.example.bicepparam`); Terraform takes a tfvars JSON file and the private backend.
+3. Generate the inputs from your environment file: `ConvertTo-NIC26BicepParam -Solution avd-session-hosts-azure-local -Config (Get-NIC26Config -Scope avd) -Execute` (or `ConvertTo-NIC26TfVars`, with the backend file from `New-NIC26TerraformBackendConfig`), then add the dependency outputs of the earlier stages. Bicep takes an ARM JSON parameters file (`az bicep build-params bicep/main.generated.bicepparam --outfile <file>`); `main.example.bicepparam` only shows the shape and is not edited. `scripts/Invoke-AzlSessionHostBuild.ps1 -EnvironmentFile <environment file>` does all of this, including the live resolution of the Azure IDs, from the `azl_session_hosts` block.
 4. Run `scripts/Invoke-SessionHostsAzureLocalDeploy.ps1` without `-Execute` (What-If / plan), then with `-Execute`. It needs `NIC26.Automation` imported and two `keyvault://` administrator references, and supplies the credentials in memory.
-5. Run `scripts/Register-AvdSessionHostsAzureLocal.ps1` without `-Execute` to preview, then with `-Execute`, passing the control-plane `New-AvdRegistrationToken.ps1` as `-TokenScriptPath`.
+5. Run `scripts/Register-AvdSessionHostsAzureLocal.ps1` without `-Execute` to preview, then with `-Execute`. Subscription, resource groups, host pool, machine names and the token script come from the environment file (`-EnvironmentFile`, default `environment/avd/environment.yml`); every explicit parameter overrides.
 
 ### One command from the environment file
 

@@ -7,6 +7,8 @@ Starts each template with the 'run' action and polls the template's lastRunStatu
 Failed/Canceled (throws with the run sub-state and message only). A build takes 45-90 minutes: it is recorded, never
 shown live. Without -Execute only the plan is printed and nothing is started.
 Authored by gpt-6-sol via the HCS Foundry gateway; reviewed by non-Anthropic models (design/shared/verification-log.md).
+.PARAMETER EnvironmentFile
+AVD environment file (default: <repo>\environment\avd\environment.yml). Every value left out (subscription, resource groups, host pool, machine or template names) is derived from it; explicit parameters override.
 .PARAMETER SubscriptionId
 Subscription containing the templates.
 .PARAMETER ResourceGroupName
@@ -20,13 +22,13 @@ Actually start the builds.
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
-    [Parameter(Mandatory)]
+    # Path of the AVD environment file (default: <repo>\environment\avd\environment.yml); every value left out below comes from it.
+    [string]$EnvironmentFile,
+
     [string]$SubscriptionId,
 
-    [Parameter(Mandatory)]
     [string]$ResourceGroupName,
 
-    [Parameter(Mandatory)]
     [string[]]$TemplateName,
 
     [ValidateRange(1, 1440)]
@@ -38,6 +40,22 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+# Values left out come from the AVD environment file (-EnvironmentFile, default: <repo>\environment\avd): subscription, resource
+# groups, host pool and machine names are derived from it and the solution name catalogs. Explicit parameters override.
+if (-not ($SubscriptionId -and $ResourceGroupName -and $TemplateName)) {
+    if (-not (Get-Command Get-NIC26AvdHostContext -ErrorAction SilentlyContinue)) {
+        Import-Module (Resolve-Path (Join-Path $PSScriptRoot '..\..\..\..\shared\powershell\NIC26.Automation\NIC26.Automation.psd1')).Path
+    }
+    $configArguments = @{ Scope = 'avd' }
+    if ($EnvironmentFile) { $configArguments.Path = Split-Path -Path (Resolve-Path -LiteralPath $EnvironmentFile).Path -Parent }
+    $hostContext = Get-NIC26AvdHostContext -Realm image -Config (Get-NIC26Config @configArguments)
+    if (-not $SubscriptionId) { $SubscriptionId = $hostContext.SubscriptionId }
+    if (-not $ResourceGroupName) { $ResourceGroupName = $hostContext.ResourceGroupName }
+    if (-not $TemplateName) { $TemplateName = $hostContext.TemplateName }
+}
+foreach ($required in 'SubscriptionId', 'ResourceGroupName', 'TemplateName') {
+    if (-not (Get-Variable -Name $required -ValueOnly)) { throw "$required is not set: pass -$required or set the values in the environment file." }
+}
 if (-not (Get-Command Start-ImageBuildSleep -ErrorAction SilentlyContinue)) {
     # Seam so tests can skip the real wait.
     function Start-ImageBuildSleep {

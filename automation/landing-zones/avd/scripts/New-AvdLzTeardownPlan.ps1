@@ -81,8 +81,12 @@ if (-not $Execute) {
 }
 
 if ($Tool -eq 'Terraform') {
-    if (-not $BackendConfig) { throw 'Terraform teardown needs -BackendConfig.' }
     $tfDir = Join-Path (Get-LzAvdSolutionRoot) 'terraform'
+    if (-not $BackendConfig) {
+        # No explicit file: render the state location from terraform_backend in the environment file.
+        try { $BackendConfig = (New-NIC26TerraformBackendConfig -Solution (Get-LzAvdSolutionRoot) -Config (Get-NIC26Config -Scope 'avd') -Execute -WhatIf:$false).FullName }
+        catch { throw "Terraform teardown needs -BackendConfig <backend.hcl> or terraform_backend in the environment file: $($_.Exception.Message)" }
+    }
     $varFile = Join-Path $tfDir 'terraform.generated.tfvars.json'
     Push-Location $tfDir
     try {

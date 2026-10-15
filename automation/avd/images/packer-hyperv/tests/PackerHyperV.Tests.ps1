@@ -38,7 +38,7 @@ Describe 'Hyper-V Packer files' {
     It 'declares the solution contract' {
         $text = Get-Content (Join-Path $script:root 'solution.yml') -Raw
         foreach ($value in @('name: avd-images-packer-hyperv', 'depends_on: [lz-azure-local]', 'hybrid_image_vhdx_path',
-                'image_manifest_path', 'secrets: [avd-image-build-admin]', 'destroy: supported', 'build_vm:')) {
+                'image_manifest_path', 'secrets: [avd-image-build-admin]', 'destroy: supported', 'vm_name:')) {
             $text | Should -Match ([regex]::Escape($value))
         }
     }
@@ -193,5 +193,65 @@ Describe 'Invoke-PackerBuild' {
     It 'refuses a variable file that carries a build password' {
         @{ build_username = 'builder'; build_password = 'x'; output_directory = $TestDrive } | ConvertTo-Json | Set-Content -LiteralPath $script:varFile
         { & $script:buildScript @script:parameters -Execute } | Should -Throw '*must not contain a build password*'
+    }
+}
+
+Describe 'Invoke-PackerBuild from the environment file (no variable file, no typed values)' {
+    BeforeAll {
+        Import-Module (Join-Path $script:root '../../../shared/powershell/NIC26.Automation/NIC26.Automation.psd1') -Force
+        $examples = Join-Path $script:root '../../../shared/examples'
+        $script:envRoot = Join-Path $TestDrive 'environment'
+        foreach ($scope in 'shared', 'avd') {
+            New-Item -ItemType Directory -Path (Join-Path $script:envRoot $scope) -Force | Out-Null
+            Copy-Item -LiteralPath (Join-Path $examples "environment.$scope.example.yml") -Destination (Join-Path $script:envRoot "$scope/environment.yml")
+        }
+        $script:envOutput = Join-Path $TestDrive 'env-output'
+        New-Item -ItemType Directory -Path $script:envOutput -Force | Out-Null
+        [System.IO.File]::WriteAllBytes((Join-Path $script:envOutput 'image.vhdx'), [byte[]]@(9, 9))
+        $avdFile = Join-Path $script:envRoot 'avd/environment.yml'
+        $yaml = [System.IO.File]::ReadAllText($avdFile)
+        $yaml = [regex]::Replace($yaml, '(?m)^  packer_output_path: .*$', "  packer_output_path: '$($script:envOutput.Replace("'", "''"))'")
+        [System.IO.File]::WriteAllText($avdFile, $yaml)
+    }
+
+    BeforeEach {
+        $global:PackerEvents = [System.Collections.Generic.List[string]]::new()
+        $global:PackerVarFile = $null
+        Mock Test-PackerInstalled { return $true }
+        Mock Resolve-NIC26KeyVaultRef {
+            if ($AsPlainText) { return 'env-builder' }
+            return (ConvertTo-SecureString 'TEST-PASSWORD' -AsPlainText -Force)
+        }
+        Mock Invoke-PackerCommand {
+            $global:PackerEvents.Add($Arguments[0])
+            $flag = $Arguments | Where-Object { $_ -like '-var-file=*' } | Select-Object -First 1
+            if ($flag) { $global:PackerVarFile = [pscustomobject]@{ Path = $flag.Substring(10); Text = (Get-Content -LiteralPath $flag.Substring(10) -Raw) } }
+            if ($Arguments[0] -eq 'version') { return @{ ExitCode = 0; StdOut = "Packer v1.11.2`n"; StdErr = '' } }
+            return @{ ExitCode = 0; StdOut = ''; StdErr = '' }
+        }
+    }
+
+    It 'plans without reading anything when only -EnvironmentPath is given' {
+        $plan = @(& $script:buildScript -EnvironmentPath (Join-Path $script:envRoot 'avd'))
+        $plan[0] | Should -Match 'generated from the environment file'
+        $global:PackerEvents.Count | Should -Be 0
+    }
+
+    It 'generates the variable file from the environment, resolves the build account from its references and removes the file afterwards' {
+        $result = & $script:buildScript -EnvironmentPath (Join-Path $script:envRoot 'avd') -Execute
+        ($global:PackerEvents -join ',') | Should -Be 'version,init,validate,build'
+        $vars = $global:PackerVarFile.Text | ConvertFrom-Json
+        $vars.build_username | Should -Be 'env-builder'
+        $vars.output_directory | Should -Be $script:envOutput
+        $vars.iso_path | Should -Not -BeNullOrEmpty
+        $vars.customizer_directory | Should -Match 'customizers$'
+        $global:PackerVarFile.Text | Should -Not -Match 'TEST-PASSWORD|build_password'
+        $global:PackerVarFile.Path | Should -Not -Exist
+        Split-Path -Leaf $result | Should -Match '^image-manifest-\d{14}\.json$'
+        Remove-Item -LiteralPath $result -ErrorAction SilentlyContinue
+    }
+
+    It 'still requires -BuildUsername and -BuildPasswordRef with an explicit -VarFile' {
+        { & $script:buildScript -VarFile (Join-Path $TestDrive 'variables.json') -Execute } | Should -Throw '*-BuildUsername and -BuildPasswordRef are required*'
     }
 }

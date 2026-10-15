@@ -10,8 +10,9 @@ depends_on: [lz-avd]
 inputs:
   - { name: org, type: string, description: "Organization identifier.", required: true, source: environment }
   - { name: naming_token, type: string, description: "Naming token.", required: true, source: environment, path: token }
-  - { name: fslogix_profile_unc, type: string, description: "Profile share UNC output of lz-avd.", required: true, source: environment }
-  - { name: fslogix_odfc_unc, type: string, description: "ODFC share UNC output of lz-avd.", required: true, source: environment }
+  - { name: share_names, type: map, description: "FSLogix share names keyed profiles and odfc; the UNC roots are \\\\<names.fslogix_sa>.file.<storage endpoint suffix>\\<share name> (lz-avd outputs fslogix_profile_unc and fslogix_odfc_unc).", required: true, source: environment }
+  - { name: fslogix_profile_unc, type: string, description: "Profile share UNC output of lz-avd; known only after lz-avd ran, so it is passed to the scripts at run time, not read from the environment file.", required: true, source: generated }
+  - { name: fslogix_odfc_unc, type: string, description: "ODFC share UNC output of lz-avd; passed to the scripts at run time (see fslogix_profile_unc).", required: true, source: generated }
   - { name: fslogix_settings_file, type: string, description: "Path to the shared FSLogix settings JSON.", required: false, default: "fslogix-settings.json", source: environment }
   - { name: redirections_xml, type: string, description: "Path to the redirections XML.", required: false, default: "redirections.xml", source: environment }
   - { name: group_object_ids, type: map, description: "Map containing avd_users and avd_admins Entra group object IDs.", required: true, source: environment }
@@ -25,4 +26,5 @@ outputs:
 secrets: []
 destroy: none
 
-names: {}
+names:
+  fslogix_sa: { type: st, purpose: fslogix }          # storage account of the shares (lz-avd); the UNC roots are built from it and share_names

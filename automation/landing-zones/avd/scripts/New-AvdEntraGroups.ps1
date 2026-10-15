@@ -22,15 +22,15 @@
     Version: 1.1.0
     TaskReference: T-3.2.2
 .EXAMPLE
-    ..New-AvdEntraGroups.ps1 -TenantId <id> -Org <org> -NamingToken <token>
+    .\New-AvdEntraGroups.ps1                      # every value from the environment file (what-if)
 .EXAMPLE
-    .\New-AvdEntraGroups.ps1 -TenantId <id> -Org <org> -NamingToken <token> -IncludeArcOnboardingPrincipal -KeyVaultName <ops-key-vault> -SecretNamePrefix <org>-<token> -Execute
+    .\New-AvdEntraGroups.ps1 -IncludeArcOnboardingPrincipal -Execute   # explicit parameters override the environment file
 #>
 [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
 param(
-    [Parameter(Mandatory)][string]$TenantId,
-    [Parameter(Mandatory)][string]$Org,
-    [Parameter(Mandatory)][string]$NamingToken,
+    [string]$TenantId,
+    [string]$Org,
+    [string]$NamingToken,
     [hashtable]$GroupNames,
     [switch]$IncludeArcOnboardingPrincipal,
     [string]$ArcOnboardingPrincipalName,
@@ -45,6 +45,21 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'LzAvd.Common.ps1')
+
+# Every parameter left out comes from the AVD environment file (tenant_id, org, token, key_vault_id, secret_name_prefix, owner_email);
+# nothing is typed into this script.
+if (-not ($TenantId -and $Org -and $NamingToken) -or ($IncludeArcOnboardingPrincipal -and -not ($KeyVaultName -and $SecretNamePrefix))) {
+    $envDefaults = Get-LzAvdEntraDefault
+    if (-not $TenantId) { $TenantId = $envDefaults.TenantId }
+    if (-not $Org) { $Org = $envDefaults.Org }
+    if (-not $NamingToken) { $NamingToken = $envDefaults.NamingToken }
+    if (-not $KeyVaultName) { $KeyVaultName = $envDefaults.KeyVaultName }
+    if (-not $SecretNamePrefix) { $SecretNamePrefix = $envDefaults.SecretNamePrefix }
+    if (-not $OwnerEmail) { $OwnerEmail = $envDefaults.OwnerEmail }
+}
+foreach ($required in 'TenantId', 'Org', 'NamingToken') {
+    if (-not (Get-Variable -Name $required -ValueOnly)) { throw "$required is not set: pass -$required or set the matching key in the environment file." }
+}
 
 if (-not $Execute) { $WhatIfPreference = $true }
 

@@ -77,7 +77,7 @@ source "vsphere-iso" "image" {
       product_key    = var.product_key
     })
   }
-  cd_label = "IICANSWER"
+  cd_label = var.answer_cd_label
 
   communicator     = "winrm"
   winrm_username   = var.build_username
