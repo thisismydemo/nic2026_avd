@@ -17,7 +17,7 @@
         ],
         "parameters": [
           {
-            "id": "d9c68aea-dd59-43fc-91e7-cf633e37dded",
+            "id": "00000000-0000-0000-0000-000000000000",
             "version": "KqlParameterItem/1.0",
             "name": "TimeRange",
             "label": "Time range",
@@ -54,7 +54,7 @@
             }
           },
           {
-            "id": "2279e725-7985-4ca3-ac48-741731e8371b",
+            "id": "11111111-1111-1111-1111-111111111111",
             "version": "KqlParameterItem/1.0",
             "name": "Terminal",
             "label": "Terminal",
