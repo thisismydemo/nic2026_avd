@@ -159,6 +159,7 @@ $global:tokenCalls++
         $global:recordedToken = $null
         $global:polls = 0
         Mock Set-AzContext {}
+        Mock Get-AzContext { [pscustomobject]@{ Tenant = [pscustomobject]@{ Id = '00000000-0000-0000-0000-000000000000' }; Subscription = [pscustomobject]@{ Id = '00000000-0000-0000-0000-000000000000' } } }   # the CI runner has no Azure login
         Mock Get-AzConnectedMachine { [pscustomobject]@{ Name = $Name; Location = 'location'; Status = 'Connected' } }
         Mock New-AzConnectedMachineExtension { $global:recordedToken = $ProtectedSetting['registrationToken'] }
         Mock Get-AzConnectedMachineExtension { [pscustomobject]@{ Name = $Name; ProvisioningState = 'Succeeded' } }
@@ -218,6 +219,7 @@ Describe 'Test-HybridHost' {
 
     BeforeEach {
         Mock Set-AzContext {}
+        Mock Get-AzContext { [pscustomobject]@{ Tenant = [pscustomobject]@{ Id = '00000000-0000-0000-0000-000000000000' }; Subscription = [pscustomobject]@{ Id = '00000000-0000-0000-0000-000000000000' } } }   # the CI runner has no Azure login
         Mock Get-AzConnectedMachine {
             if ($Name) { [pscustomobject]@{ Name = $Name; Status = 'Connected' } }
             else { [pscustomobject]@{ Name = 'vm-one'; Status = 'Connected' } }

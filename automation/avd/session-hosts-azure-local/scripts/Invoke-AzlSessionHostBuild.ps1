@@ -75,16 +75,60 @@ function Get-ArmId {
 
 Set-AzContext -WhatIf:$false -SubscriptionId $azlSub -Tenant (Get-AzContext).Tenant.Id | Out-Null
 $customLocation = Get-ArmId $azlSub $rg 'Microsoft.ExtendedLocation/customLocations' $cfg['custom_location']
-$lnet = Get-ArmId $azlSub $rg 'Microsoft.AzureStackHCI/logicalNetworks' $cfg['logical_network']
+# A host may name its own logical network (owner, 14 Oct: the DHCP-type lnet, so new hosts get their gateway from the VLAN's
+# DHCP server - finding F-1); the hosts built in one run must share one.
+$selected = @($cfg['hosts'] | Where-Object { -not $VmName -or $VmName -contains [string]$_['name'] })
+$lnetNames = @($selected | ForEach-Object { if ($_.Contains('logical_network')) { [string]$_['logical_network'] } else { [string]$cfg['logical_network'] } } | Select-Object -Unique)
+if ($lnetNames.Count -ne 1) { throw "The selected hosts use different logical networks ($($lnetNames -join ', ')); build them separately with -VmName." }
+$lnet = Get-ArmId $azlSub $rg 'Microsoft.AzureStackHCI/logicalNetworks' $lnetNames[0]
 $image = Get-ArmId $azlSub $rg 'Microsoft.AzureStackHCI/galleryImages' $cfg['image']
 foreach ($pair in @(@($lnet, 'logical network'), @($image, 'image'))) {
     $state = (Get-AzResource -ResourceId $pair[0].ResourceId -ExpandProperties).Properties.provisioningState
     if ($state -ne 'Succeeded') { throw "The $($pair[1]) $($pair[0].Name) is $state, not Succeeded." }
 }
-$lnetDns = @((Get-AzResource -ResourceId $lnet.ResourceId -ExpandProperties).Properties.dhcpOptions.dnsServers)
 $lnetProps = (Get-AzResource -ResourceId $lnet.ResourceId -ExpandProperties).Properties
-$gateway = [string](@($lnetProps.subnets[0].properties.routeTable.properties.routes | Where-Object { $_.properties.addressPrefix -eq '0.0.0.0/0' })[0].properties.nextHopIpAddress)
+# a static lnet carries DNS and the default route; a DHCP-type lnet carries neither (the VLAN's DHCP server supplies both)
+$opt = { param($o, [string[]]$path) foreach ($p in $path) { if ($null -eq $o -or -not $o.PSObject.Properties[$p]) { return $null }; $o = $o.$p }; $o }
+$lnetDns = @(& $opt $lnetProps @('dhcpOptions', 'dnsServers') | Where-Object { $_ })
+$routes = @(& $opt $lnetProps.subnets[0] @('properties', 'routeTable', 'properties', 'routes') | Where-Object { $_ })
+$gateway = if ($routes) { [string](@($routes | Where-Object { $_.properties.addressPrefix -eq '0.0.0.0/0' })[0].properties.nextHopIpAddress) } else { 'from the VLAN DHCP server' }
 
+function Set-GuestDefaultRoute {
+    # F-1 workaround (owner, 14 Oct: "if that means a route inside the VM then do it"), only when azl_session_hosts
+    # guest_default_route is true: the static logical network's DHCP gives the guest its IP and DNS but no gateway on this
+    # build, so add a persistent 0.0.0.0/0 route to the logical network's gateway inside the guest over PowerShell Direct
+    # from the node that runs it (as al01-al03 were built). Returns the number of hosts that have the route.
+    param([object[]]$HostList)
+    if ($gateway -notmatch '^\d') { Write-Warning 'The logical network has no default route; guest route skipped.'; return 0 }
+    $nodeCred = [pscredential]::new(
+        [string](Resolve-NIC26KeyVaultRef -Ref $cfg['node_admin_username_secret'] -AsPlainText),
+        (Resolve-NIC26KeyVaultRef -Ref $cfg['node_admin_password_secret']))
+    $guestUser = [string](Resolve-NIC26KeyVaultRef -Ref $envData['secret_refs']['sessionhost_local_admin_username'] -AsPlainText)
+    $guestPw = Resolve-NIC26KeyVaultRef -Ref $envData['secret_refs']['sessionhost_local_admin_password']
+    $done = 0
+    foreach ($h in $HostList) {
+        $guestCred = [pscredential]::new("$($h['computer_name'])\$guestUser", $guestPw)
+        foreach ($node in @($cfg['node_addresses'])) {
+            $r = Invoke-Command -ComputerName $node -Credential $nodeCred -ArgumentList $h['name'], $guestCred, $gateway -ScriptBlock {
+                param($name, [pscredential]$cred, $g)
+                $vm = Get-VM | Where-Object { $_.Name -like "$name-*" -or $_.Name -eq $name } | Where-Object State -EQ 'Running' | Select-Object -First 1
+                if (-not $vm) { return $null }
+                try {
+                    Invoke-Command -VMName $vm.Name -Credential $cred -ArgumentList $g -ErrorAction Stop -ScriptBlock {
+                        param($gw)
+                        if (Get-NetRoute -DestinationPrefix '0.0.0.0/0' -AddressFamily IPv4 -PolicyStore PersistentStore -ErrorAction SilentlyContinue | Where-Object NextHop -EQ $gw) { return 'present' }
+                        $if = @(Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' })[0]
+                        New-NetRoute -DestinationPrefix '0.0.0.0/0' -InterfaceIndex $if.InterfaceIndex -NextHop $gw -RouteMetric 10 | Out-Null
+                        'added'
+                    }
+                }
+                catch { "guest not ready: $($_.Exception.Message)" }
+            }
+            if ($r) { Write-Information "$($h['name']): default route via $gateway $r"; if ($r -in 'present', 'added') { $done++ }; break }
+        }
+    }
+    return $done
+}
 function Test-GuestNetwork {
     # Stage 1b: returns the number of hosts whose guest has a DHCP-supplied default gateway. Adds no route.
     param([object[]]$HostList)
@@ -101,6 +145,9 @@ function Test-GuestNetwork {
         if ($st.State -ne 'ok') { Write-Information "${name}: guest $($st.State)"; continue }
         if (-not $script:guestSeen.ContainsKey($name)) { $script:guestSeen[$name] = Get-Date }
         if ($st.DhcpGateway) { Write-Information "${name}: DHCP gateway $($st.DhcpGateway) (expected $gateway), Azure 443 $($st.EndpointReachable)"; $ok++; continue }
+        if ($cfg.Contains('guest_default_route') -and [bool]$cfg['guest_default_route']) {
+            if ((Set-GuestDefaultRoute -HostList @($h)) -gt 0) { $ok++; continue }
+        }
         $waited = ((Get-Date) - $script:guestSeen[$name]).TotalMinutes
         Write-Information ("{0}: no DHCP-supplied default gateway yet ({1:N0} of {2} min; active default routes '{3}')" -f $name, $waited, $GatewayTimeoutMinutes, $st.ActiveDefaultRoutes)
         if ($waited -ge $GatewayTimeoutMinutes) { throw "${name}: the logical network's DHCP supplied no default gateway within $GatewayTimeoutMinutes min; no route is added (owner). Check the logical network / SDN DHCP." }

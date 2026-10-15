@@ -29,7 +29,8 @@ $global:AzureLocalFake.TokenCalls++
 '@
 
     # Stubs declare the REAL cmdlet parameter lists (Az.ConnectedMachine): a wrong parameter name fails binding.
-    function global:Set-AzContext { param($SubscriptionId) }
+    function global:Set-AzContext { param($SubscriptionId, $Tenant) }
+    function global:Get-AzContext { [pscustomobject]@{ Tenant = [pscustomobject]@{ Id = '00000000-0000-0000-0000-000000000000' }; Subscription = [pscustomobject]@{ Id = '00000000-0000-0000-0000-000000000000' } } }   # the CI runner has no Azure login
     function global:Get-AzConnectedMachine {
         param($Name, $ResourceGroupName, $SubscriptionId, [string]$Expand)
         [pscustomobject]@{ Location = 'test-location'; Status = $global:AzureLocalFake.Connection; OSName = 'Windows 11' }
@@ -67,7 +68,7 @@ $global:AzureLocalFake.TokenCalls++
 
 
 AfterAll {
-    foreach ($name in @('Set-AzContext', 'Get-AzConnectedMachine', 'New-AzConnectedMachineRunCommand',
+    foreach ($name in @('Set-AzContext', 'Get-AzContext', 'Get-AzConnectedMachine', 'New-AzConnectedMachineRunCommand',
             'Get-AzConnectedMachineRunCommand', 'Remove-AzConnectedMachineRunCommand',
             'Get-AzWvdSessionHost', 'Start-SessionHostSleep')) {
         Remove-Item "Function:\global:$name" -ErrorAction SilentlyContinue

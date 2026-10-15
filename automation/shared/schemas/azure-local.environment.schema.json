@@ -745,6 +745,10 @@
         }
       }
     },
+    "remoting_credential_base": {
+      "type": "string",
+      "description": "Ops-vault secret base (<base>-username/-password) the demo scripts use for PowerShell remoting to a Local Identity cluster; empty = the operator session"
+    },
     "log_analytics_workspace_id": {
       "$ref": "#/$defs/resourceIdOrEmpty",
       "description": "Landing-zone output recorded for the deploy and Day-2 solutions."

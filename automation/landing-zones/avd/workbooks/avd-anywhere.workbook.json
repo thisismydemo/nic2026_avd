@@ -1,0 +1,744 @@
+{
+  "version": "Notebook/1.0",
+  "items": [
+    {
+      "type": 1,
+      "content": {
+        "json": "## AVD Anywhere · three terminals\nOne Log Analytics workspace, three host pools: **Terminal A** on Azure, **Terminal B** on Azure Local, **Terminal C** on AVD Hybrid (Hyper-V hosts seen through Azure Arc). The same agent, the same counters and the same AVD diagnostics from every terminal. Filter by terminal; select a host in the table to drill into it. For the per-pool deep view open *Azure Virtual Desktop > Insights* and pick a host pool."
+      },
+      "name": "text-2"
+    },
+    {
+      "type": 9,
+      "content": {
+        "version": "KqlParameterItem/1.0",
+        "crossComponentResources": [
+          "__WORKSPACE_ID__"
+        ],
+        "parameters": [
+          {
+            "id": "d9c68aea-dd59-43fc-91e7-cf633e37dded",
+            "version": "KqlParameterItem/1.0",
+            "name": "TimeRange",
+            "label": "Time range",
+            "type": 4,
+            "isRequired": true,
+            "value": {
+              "durationMs": 14400000
+            },
+            "typeSettings": {
+              "selectableValues": [
+                {
+                  "durationMs": 1800000
+                },
+                {
+                  "durationMs": 3600000
+                },
+                {
+                  "durationMs": 14400000
+                },
+                {
+                  "durationMs": 43200000
+                },
+                {
+                  "durationMs": 86400000
+                },
+                {
+                  "durationMs": 259200000
+                },
+                {
+                  "durationMs": 604800000
+                }
+              ],
+              "allowCustom": true
+            }
+          },
+          {
+            "id": "2279e725-7985-4ca3-ac48-741731e8371b",
+            "version": "KqlParameterItem/1.0",
+            "name": "Terminal",
+            "label": "Terminal",
+            "type": 2,
+            "isRequired": true,
+            "multiSelect": true,
+            "quote": "'",
+            "delimiter": ",",
+            "query": "__TERMINALS__\n| project value = Terminal, label = Terminal, selected = true",
+            "typeSettings": {
+              "showDefault": false,
+              "limitSelectTo": 10
+            },
+            "timeContext": {
+              "durationMs": 14400000
+            },
+            "queryType": 0,
+            "resourceType": "microsoft.operationalinsights/workspaces",
+            "crossComponentResources": [
+              "__WORKSPACE_ID__"
+            ]
+          }
+        ],
+        "style": "pills",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces"
+      },
+      "name": "parameters"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "### 1. Session hosts\nAvailable hosts per terminal, then every host with its agent status, drain mode and the last report from the AVD agent and the last heartbeat from the Azure Monitor agent."
+      },
+      "name": "text-3"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let Terminals = __TERMINALS__;\nWVDAgentHealthStatus\n| extend Pool = tolower(tostring(split(_ResourceId, '/')[8]))\n| summarize arg_max(TimeGenerated, Status, AllowNewSessions) by Host = tolower(SessionHostName), Pool\n| join kind=inner (Terminals | project Pool = tolower(Pool), Terminal) on Pool\n| summarize Available = countif(Status == 'Available'), Drained = countif(Status == 'Available' and AllowNewSessions !~ 'True'), Hosts = count() by Terminal\n| join kind=rightouter (Terminals | project Terminal) on Terminal\n| project Terminal = Terminal1, Available = coalesce(Available, 0), Drained = coalesce(Drained, 0), Hosts = coalesce(Hosts, 0)\n| where Terminal in ({Terminal})\n| extend Summary = strcat('of ', Hosts, ' session hosts Available', iff(Drained > 0, strcat(' (', Drained, ' in drain mode)'), ''))\n| order by Terminal asc",
+        "size": 0,
+        "title": "Session hosts Available, per terminal",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_ID__"
+        ],
+        "visualization": "tiles",
+        "noDataMessage": "No session host has reported yet in this time range.",
+        "tileSettings": {
+          "titleContent": {
+            "columnMatch": "Terminal",
+            "formatter": 1
+          },
+          "leftContent": {
+            "columnMatch": "Available",
+            "formatter": 12,
+            "formatOptions": {
+              "palette": "none"
+            },
+            "numberFormat": {
+              "unit": 17,
+              "options": {
+                "style": "decimal",
+                "maximumFractionDigits": 0
+              }
+            }
+          },
+          "secondaryContent": {
+            "columnMatch": "Summary",
+            "formatter": 1
+          },
+          "showBorder": true,
+          "size": "auto"
+        }
+      },
+      "name": "tiles-hosts"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let Terminals = __TERMINALS__;\nlet ama = Heartbeat\n| summarize MonitoringHeartbeat = max(TimeGenerated), Machine = take_any(_ResourceId) by Host = tolower(Computer);\nWVDAgentHealthStatus\n| extend Pool = tolower(tostring(split(_ResourceId, '/')[8]))\n| summarize arg_max(TimeGenerated, Status, AllowNewSessions, AgentVersion) by Host = tolower(SessionHostName), Pool\n| join kind=inner (Terminals | project Pool = tolower(Pool), Terminal) on Pool\n| where Terminal in ({Terminal})\n| join kind=leftouter ama on Host\n| project Terminal, Host, Status, ['New sessions'] = iff(AllowNewSessions =~ 'True', 'Allowed', 'Drain mode'),\n    ['AVD agent last report'] = TimeGenerated, ['Monitoring agent heartbeat'] = MonitoringHeartbeat, ['Agent version'] = AgentVersion, Machine\n| order by Terminal asc, Host asc",
+        "size": 0,
+        "title": "Every session host (select a row to drill into that host)",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_ID__"
+        ],
+        "visualization": "table",
+        "noDataMessage": "No session host has reported yet in this time range.",
+        "exportFieldName": "Host",
+        "exportParameterName": "SelectedHost",
+        "gridSettings": {
+          "formatters": [
+            {
+              "columnMatch": "Status",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "icons",
+                "thresholdsGrid": [
+                  {
+                    "operator": "==",
+                    "thresholdValue": "Available",
+                    "representation": "success",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "Shutdown",
+                    "representation": "warning",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "Upgrading",
+                    "representation": "warning",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "Default",
+                    "thresholdValue": null,
+                    "representation": "failed",
+                    "text": "{0}{1}"
+                  }
+                ]
+              }
+            },
+            {
+              "columnMatch": "Machine",
+              "formatter": 13,
+              "formatOptions": {
+                "linkTarget": "Resource",
+                "showIcon": true
+              }
+            }
+          ],
+          "rowLimit": 100,
+          "filter": true
+        }
+      },
+      "name": "table-hosts"
+    },
+    {
+      "type": 12,
+      "content": {
+        "version": "NotebookGroup/1.0",
+        "groupType": "editable",
+        "title": "Host drill-down: {SelectedHost}",
+        "items": [
+          {
+            "type": 1,
+            "content": {
+              "json": "Selected in the table above. Select another row to switch hosts; the **Machine** link opens the Azure VM or the Arc-enabled machine."
+            },
+            "name": "text-1"
+          },
+          {
+            "type": 3,
+            "content": {
+              "version": "KqlItem/1.0",
+              "query": "Perf\n| where tolower(Computer) == '{SelectedHost}'\n| where (ObjectName == 'Processor Information' and CounterName == '% Processor Time' and InstanceName == '_Total')\n    or (ObjectName == 'Memory' and CounterName == '% Committed Bytes In Use')\n| extend Counter = iff(ObjectName == 'Memory', 'Memory committed %', 'CPU %')\n| summarize Value = round(avg(CounterValue), 1) by Counter, bin(TimeGenerated, {TimeRange:grain})",
+              "size": 0,
+              "title": "CPU and memory: {SelectedHost}",
+              "timeContextFromParameter": "TimeRange",
+              "queryType": 0,
+              "resourceType": "microsoft.operationalinsights/workspaces",
+              "crossComponentResources": [
+                "__WORKSPACE_ID__"
+              ],
+              "visualization": "timechart",
+              "chartSettings": {
+                "ySettings": {
+                  "min": 0,
+                  "max": 100
+                }
+              }
+            },
+            "name": "chart-host-perf",
+            "customWidth": "50"
+          },
+          {
+            "type": 3,
+            "content": {
+              "version": "KqlItem/1.0",
+              "query": "WVDAgentHealthStatus\n| where tolower(SessionHostName) == '{SelectedHost}'\n| summarize Reports = count() by Status, bin(TimeGenerated, {TimeRange:grain})",
+              "size": 0,
+              "title": "AVD agent status reports: {SelectedHost}",
+              "timeContextFromParameter": "TimeRange",
+              "queryType": 0,
+              "resourceType": "microsoft.operationalinsights/workspaces",
+              "crossComponentResources": [
+                "__WORKSPACE_ID__"
+              ],
+              "visualization": "categoricalbar",
+              "chartSettings": {
+                "seriesLabelSettings": [
+                  {
+                    "seriesName": "Available",
+                    "color": "green"
+                  },
+                  {
+                    "seriesName": "Unavailable",
+                    "color": "redBright"
+                  },
+                  {
+                    "seriesName": "Shutdown",
+                    "color": "gray"
+                  }
+                ]
+              }
+            },
+            "name": "chart-host-status",
+            "customWidth": "50"
+          },
+          {
+            "type": 3,
+            "content": {
+              "version": "KqlItem/1.0",
+              "query": "Event\n| where tolower(Computer) == '{SelectedHost}' and EventLevelName in ('Error', 'Warning')\n| project TimeGenerated, Level = EventLevelName, Log = EventLog, Source, ['Event ID'] = EventID, Message = substring(RenderedDescription, 0, 400)\n| order by TimeGenerated desc",
+              "size": 0,
+              "title": "Windows errors and warnings: {SelectedHost}",
+              "timeContextFromParameter": "TimeRange",
+              "queryType": 0,
+              "resourceType": "microsoft.operationalinsights/workspaces",
+              "crossComponentResources": [
+                "__WORKSPACE_ID__"
+              ],
+              "visualization": "table",
+              "noDataMessage": "No errors or warnings from this host in this time range.",
+              "gridSettings": {
+                "formatters": [
+                  {
+                    "columnMatch": "Level",
+                    "formatter": 18,
+                    "formatOptions": {
+                      "thresholdsOptions": "icons",
+                      "thresholdsGrid": [
+                        {
+                          "operator": "==",
+                          "thresholdValue": "Error",
+                          "representation": "failed",
+                          "text": "{0}{1}"
+                        },
+                        {
+                          "operator": "==",
+                          "thresholdValue": "Warning",
+                          "representation": "warning",
+                          "text": "{0}{1}"
+                        },
+                        {
+                          "operator": "Default",
+                          "thresholdValue": null,
+                          "representation": "warning",
+                          "text": "{0}{1}"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "columnMatch": "Message",
+                    "formatter": 0,
+                    "formatOptions": {
+                      "customColumnWidthSetting": "560px"
+                    }
+                  }
+                ],
+                "rowLimit": 50
+              }
+            },
+            "name": "table-host-events"
+          }
+        ]
+      },
+      "name": "group-host",
+      "conditionalVisibility": {
+        "parameterName": "SelectedHost",
+        "comparison": "isNotEqualTo"
+      }
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "### 2. Host performance\nThe same performance counters from an Azure VM, an Azure Local VM and a Hyper-V VM, split by terminal."
+      },
+      "name": "text-4"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let Terminals = __TERMINALS__;\nPerf\n| where ObjectName == 'Processor Information' and CounterName == '% Processor Time' and InstanceName == '_Total'\n| extend Host = tolower(Computer)\n| extend Prefix = extract(@'^(.*?)[0-9]+(\\.|$)', 1, Host)\n| join kind=inner (Terminals | project Prefix = tolower(Prefix), Terminal) on Prefix\n| where Terminal in ({Terminal})\n| summarize Value = round(avg(CounterValue), 1) by Terminal, bin(TimeGenerated, {TimeRange:grain})",
+        "size": 0,
+        "title": "CPU % (average across the terminal's hosts)",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_ID__"
+        ],
+        "visualization": "timechart",
+        "chartSettings": {
+          "ySettings": {
+            "min": 0,
+            "max": 100
+          }
+        }
+      },
+      "name": "chart-cpu",
+      "customWidth": "50"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let Terminals = __TERMINALS__;\nPerf\n| where ObjectName == 'Memory' and CounterName == '% Committed Bytes In Use'\n| extend Host = tolower(Computer)\n| extend Prefix = extract(@'^(.*?)[0-9]+(\\.|$)', 1, Host)\n| join kind=inner (Terminals | project Prefix = tolower(Prefix), Terminal) on Prefix\n| where Terminal in ({Terminal})\n| summarize Value = round(avg(CounterValue), 1) by Terminal, bin(TimeGenerated, {TimeRange:grain})",
+        "size": 0,
+        "title": "Memory committed % (average across the terminal's hosts)",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_ID__"
+        ],
+        "visualization": "timechart",
+        "chartSettings": {
+          "ySettings": {
+            "min": 0,
+            "max": 100
+          }
+        }
+      },
+      "name": "chart-memory",
+      "customWidth": "50"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let Terminals = __TERMINALS__;\nPerf\n| where ObjectName == 'User Input Delay per Session' and CounterName == 'Max Input Delay' and InstanceName == 'Max'\n| extend Host = tolower(Computer)\n| extend Prefix = extract(@'^(.*?)[0-9]+(\\.|$)', 1, Host)\n| join kind=inner (Terminals | project Prefix = tolower(Prefix), Terminal) on Prefix\n| where Terminal in ({Terminal})\n| summarize Value = round(percentile(CounterValue, 95), 0) by Terminal, bin(TimeGenerated, {TimeRange:grain})",
+        "size": 0,
+        "title": "User input delay, ms (95th percentile of the per-host session maximum)",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_ID__"
+        ],
+        "visualization": "timechart",
+        "noDataMessage": "No input delay samples yet: they come from user sessions."
+      },
+      "name": "chart-input-delay",
+      "customWidth": "50"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let Terminals = __TERMINALS__;\nPerf\n| where ObjectName == 'Memory' and CounterName == 'Available MBytes'\n| extend Host = tolower(Computer)\n| extend Prefix = extract(@'^(.*?)[0-9]+(\\.|$)', 1, Host)\n| join kind=inner (Terminals | project Prefix = tolower(Prefix), Terminal) on Prefix\n| where Terminal in ({Terminal})\n| summarize Value = min(CounterValue) by Terminal, bin(TimeGenerated, {TimeRange:grain})",
+        "size": 0,
+        "title": "Memory available, MB (lowest host in the terminal)",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_ID__"
+        ],
+        "visualization": "timechart"
+      },
+      "name": "chart-available-mb",
+      "customWidth": "50"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "### 3. Connections and errors\nFrom the host pool diagnostics (WVDConnections, WVDErrors). These fill as users connect."
+      },
+      "name": "text-5"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let Terminals = __TERMINALS__;\nWVDConnections\n| where State == 'Connected'\n| extend Pool = tolower(tostring(split(_ResourceId, '/')[8]))\n| join kind=inner (Terminals | project Pool = tolower(Pool), Terminal) on Pool\n| where Terminal in ({Terminal})\n| summarize Connections = dcount(CorrelationId), Users = dcount(UserName) by Terminal\n| extend Summary = strcat(Users, ' user(s)')\n| order by Terminal asc",
+        "size": 0,
+        "title": "Connections per terminal",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_ID__"
+        ],
+        "visualization": "tiles",
+        "noDataMessage": "No connections yet. Sign in to a terminal from Windows App or the web client: the connection shows here within a few minutes.",
+        "tileSettings": {
+          "titleContent": {
+            "columnMatch": "Terminal",
+            "formatter": 1
+          },
+          "leftContent": {
+            "columnMatch": "Connections",
+            "formatter": 12,
+            "formatOptions": {
+              "palette": "none"
+            },
+            "numberFormat": {
+              "unit": 17,
+              "options": {
+                "style": "decimal",
+                "maximumFractionDigits": 0
+              }
+            }
+          },
+          "secondaryContent": {
+            "columnMatch": "Summary",
+            "formatter": 1
+          },
+          "showBorder": true,
+          "size": "auto"
+        }
+      },
+      "name": "tiles-connections",
+      "customWidth": "50"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let Terminals = __TERMINALS__;\nWVDConnections\n| where State == 'Connected'\n| extend Pool = tolower(tostring(split(_ResourceId, '/')[8]))\n| join kind=inner (Terminals | project Pool = tolower(Pool), Terminal) on Pool\n| where Terminal in ({Terminal})\n| summarize Connections = dcount(CorrelationId) by Terminal, bin(TimeGenerated, {TimeRange:grain})",
+        "size": 0,
+        "title": "Connections over time",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_ID__"
+        ],
+        "visualization": "timechart",
+        "noDataMessage": "No connections yet. Sign in to a terminal from Windows App or the web client: the connection shows here within a few minutes."
+      },
+      "name": "chart-connections",
+      "customWidth": "50"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let Terminals = __TERMINALS__;\nWVDConnections\n| extend Pool = tolower(tostring(split(_ResourceId, '/')[8]))\n| join kind=inner (Terminals | project Pool = tolower(Pool), Terminal) on Pool\n| where Terminal in ({Terminal})\n| summarize arg_max(TimeGenerated, State, UserName, SessionHostName, ClientType, ClientOS, TransportType, UdpType, GatewayRegion), Started = min(TimeGenerated) by CorrelationId, Terminal\n| project Started, Terminal, User = tostring(split(UserName, '@')[0]), Host = tolower(SessionHostName), ['Last state'] = State,\n    Client = ClientType, ['Client OS'] = ClientOS, Transport = case(isnotempty(UdpType), strcat('UDP (', UdpType, ')'), isnotempty(TransportType), TransportType, 'TCP'), Gateway = GatewayRegion\n| order by Started desc",
+        "size": 0,
+        "title": "Recent connections (user shown by alias)",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_ID__"
+        ],
+        "visualization": "table",
+        "noDataMessage": "No connections yet. Sign in to a terminal from Windows App or the web client: the connection shows here within a few minutes.",
+        "gridSettings": {
+          "rowLimit": 50,
+          "filter": true
+        }
+      },
+      "name": "table-connections"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let Terminals = __TERMINALS__;\nWVDErrors\n| extend Pool = tolower(tostring(split(_ResourceId, '/')[8]))\n| join kind=leftouter (Terminals | project Pool = tolower(Pool), Terminal) on Pool\n| extend Terminal = iff(isempty(Terminal), strcat('Workspace / feed (', Pool, ')'), Terminal)\n| where Terminal in ({Terminal}) or Terminal startswith 'Workspace'\n| summarize Errors = count(), Users = dcount(UserName), Last = max(TimeGenerated), Message = take_any(Message) by Terminal, Activity = ActivityType, Code = CodeSymbolic, ['Service error'] = ServiceError\n| order by Errors desc",
+        "size": 0,
+        "title": "AVD errors per terminal (WVDErrors)",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_ID__"
+        ],
+        "visualization": "table",
+        "noDataMessage": "No AVD errors in this time range.",
+        "gridSettings": {
+          "formatters": [
+            {
+              "columnMatch": "Message",
+              "formatter": 0,
+              "formatOptions": {
+                "customColumnWidthSetting": "480px"
+              }
+            }
+          ],
+          "rowLimit": 50
+        }
+      },
+      "name": "table-errors"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "### 4. Profiles (FSLogix)\nFSLogix events from the hosts' event logs, per terminal: Azure Files for Terminal A, the Scale-Out File Server on Azure Local for Terminals B and C."
+      },
+      "name": "text-6"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let Terminals = __TERMINALS__;\nEvent\n| where EventLog startswith 'Microsoft-FSLogix-Apps'\n| extend Host = tolower(Computer)\n| extend Prefix = extract(@'^(.*?)[0-9]+(\\.|$)', 1, Host)\n| join kind=inner (Terminals | project Prefix = tolower(Prefix), Terminal) on Prefix\n| summarize ['Profile events'] = count(), Warnings = countif(EventLevelName == 'Warning'), Errors = countif(EventLevelName == 'Error'), Hosts = dcount(Host), Last = max(TimeGenerated) by Terminal\n| join kind=rightouter (Terminals | project Terminal) on Terminal\n| project Terminal = Terminal1, ['Profile events'] = coalesce(['Profile events'], 0), Warnings = coalesce(Warnings, 0), Errors = coalesce(Errors, 0), Hosts = coalesce(Hosts, 0), Last\n| where Terminal in ({Terminal})\n| order by Terminal asc",
+        "size": 0,
+        "title": "FSLogix events per terminal",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_ID__"
+        ],
+        "visualization": "table",
+        "noDataMessage": "No FSLogix events in this time range: they appear when a profile container is attached at sign-in.",
+        "gridSettings": {
+          "formatters": [
+            {
+              "columnMatch": "Errors",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "colors",
+                "thresholdsGrid": [
+                  {
+                    "operator": ">",
+                    "thresholdValue": "0",
+                    "representation": "redBright",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "Default",
+                    "thresholdValue": null,
+                    "representation": "green",
+                    "text": "{0}{1}"
+                  }
+                ]
+              }
+            },
+            {
+              "columnMatch": "Warnings",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "colors",
+                "thresholdsGrid": [
+                  {
+                    "operator": ">",
+                    "thresholdValue": "0",
+                    "representation": "orange",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "Default",
+                    "thresholdValue": null,
+                    "representation": "green",
+                    "text": "{0}{1}"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "name": "table-fslogix-summary",
+      "customWidth": "40"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let Terminals = __TERMINALS__;\nEvent\n| where EventLog startswith 'Microsoft-FSLogix-Apps' and EventLevelName in ('Error', 'Warning')\n| extend Host = tolower(Computer)\n| extend Prefix = extract(@'^(.*?)[0-9]+(\\.|$)', 1, Host)\n| join kind=inner (Terminals | project Prefix = tolower(Prefix), Terminal) on Prefix\n| where Terminal in ({Terminal})\n| project TimeGenerated, Terminal, Host, Level = EventLevelName, ['Event ID'] = EventID, Log = EventLog, Message = substring(RenderedDescription, 0, 400)\n| order by TimeGenerated desc",
+        "size": 0,
+        "title": "FSLogix errors and warnings",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_ID__"
+        ],
+        "visualization": "table",
+        "noDataMessage": "No FSLogix errors or warnings in this time range.",
+        "gridSettings": {
+          "formatters": [
+            {
+              "columnMatch": "Level",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "icons",
+                "thresholdsGrid": [
+                  {
+                    "operator": "==",
+                    "thresholdValue": "Error",
+                    "representation": "failed",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "Warning",
+                    "representation": "warning",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "Default",
+                    "thresholdValue": null,
+                    "representation": "warning",
+                    "text": "{0}{1}"
+                  }
+                ]
+              }
+            },
+            {
+              "columnMatch": "Message",
+              "formatter": 0,
+              "formatOptions": {
+                "customColumnWidthSetting": "520px"
+              }
+            }
+          ],
+          "rowLimit": 50
+        }
+      },
+      "name": "table-fslogix-errors",
+      "customWidth": "60"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "### 5. Changes\nHost registrations and control-plane changes (WVDManagement). A host deployed live shows up here as it registers."
+      },
+      "name": "text-7"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let Terminals = __TERMINALS__;\nWVDHostRegistrations\n| extend Pool = tolower(tostring(split(_ResourceId, '/')[8]))\n| join kind=inner (Terminals | project Pool = tolower(Pool), Terminal) on Pool\n| where Terminal in ({Terminal})\n| project TimeGenerated, Terminal, Host = tolower(SessionHostName)\n| order by TimeGenerated desc",
+        "size": 0,
+        "title": "Session hosts registered (a live deploy appears here)",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_ID__"
+        ],
+        "visualization": "table",
+        "noDataMessage": "No session host registered in this time range.",
+        "gridSettings": {
+          "rowLimit": 50
+        }
+      },
+      "name": "table-registrations",
+      "customWidth": "40"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let Terminals = __TERMINALS__;\nWVDManagement\n| where ObjectsCreated + ObjectsUpdated + ObjectsDeleted > 0\n| extend Pool = tolower(tostring(split(_ResourceId, '/')[8]))\n| extend Kind = tostring(split(_ResourceId, '/')[7])\n| join kind=leftouter (Terminals | project Pool = tolower(Pool), Terminal) on Pool\n| extend Terminal = iff(isempty(Terminal), strcat(Kind, ' / ', Pool), Terminal)\n| where Terminal in ({Terminal}) or Terminal !startswith 'Terminal'\n| project TimeGenerated, Terminal, Operation = trim_start('Arm', Route), Object = tolower(tostring(split(ArmObjectScope, '/')[-1])),\n    Created = ObjectsCreated, Updated = ObjectsUpdated, Deleted = ObjectsDeleted, By = tostring(split(UserName, '@')[0])\n| order by TimeGenerated desc",
+        "size": 0,
+        "title": "Control-plane changes (WVDManagement: creates, updates, deletes)",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_ID__"
+        ],
+        "visualization": "table",
+        "noDataMessage": "No control-plane changes in this time range.",
+        "gridSettings": {
+          "rowLimit": 100,
+          "filter": true
+        }
+      },
+      "name": "table-management",
+      "customWidth": "60"
+    }
+  ],
+  "fallbackResourceIds": [
+    "__WORKSPACE_ID__"
+  ],
+  "$schema": "https://github.com/Microsoft/Application-Insights-Workbooks/blob/master/schema/workbook.json"
+}
